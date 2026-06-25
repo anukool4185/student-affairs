@@ -755,6 +755,23 @@ function companyDownloadSelected(token, ids) {
   return { base64: Utilities.base64Encode(zipBlob.getBytes()), filename: 'student_photos_' + new Date().getTime() + '.zip' };
 }
 
+// ========================= SETUP (รันมือครั้งแรกเพื่อเชื่อมต่อ/อนุญาตสิทธิ์ Google) =========================
+/**
+ * รันฟังก์ชันนี้มือ 1 ครั้งจากใน Apps Script editor (เลือก "setup" ที่ dropdown ด้านบน แล้วกด Run ▶️)
+ * เพื่อ:
+ *   1) กระตุ้นหน้าขออนุญาตสิทธิ์ (Authorize) เข้าถึง Sheets/Drive ของ Google
+ *   2) สร้างชีท "นักเรียน" และ "ผู้ใช้งานระบบ" (พร้อมบัญชี admin/teacher/company เริ่มต้น)
+ *   3) สร้างโฟลเดอร์ "รูปภาพนักเรียน" และ "รูปภาพนักเรียน_รอเผยแพร่" ใน Drive
+ * ดูผลลัพธ์ได้ที่ View > Logs (หรือ Ctrl+Enter) หลังรันเสร็จ
+ */
+function setup() {
+  getSheet();
+  getUsersSheet_();
+  getRootFolder_();
+  getTempFolder_();
+  Logger.log('ตั้งค่าเริ่มต้นเสร็จสมบูรณ์ — เปิด Google Sheet ของคุณ ควรเห็นชีท "นักเรียน" และ "ผู้ใช้งานระบบ" แล้ว');
+}
+
 // ========================= MENU (เปิดจากหน้า Google Sheet) =========================
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('ระบบรูปภาพนักเรียน')
