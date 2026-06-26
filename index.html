@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f4f6f9; --card: #ffffff;
+      --border: #e2e8f0; --text: #1e293b; --text-muted: #64748b; --success: #16a34a; --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); }
+
+    #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .login-card h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
+    .login-card p.sub { text-align: center; color: var(--text-muted); font-size: 13px; margin: 0 0 22px; }
+
+    header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    header .title h1 { margin: 0; font-size: 19px; font-weight: 600; }
+    header .title p { margin: 2px 0 0; font-size: 12.5px; opacity: 0.9; }
+    header .userbox { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    header .userbox button { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: 'Sarabun', sans-serif; font-size: 13px; }
+    header .userbox button:hover { background: rgba(255,255,255,0.3); }
+
+    nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); overflow-x: auto; position: sticky; top: 0; z-index: 10; }
+    nav button { flex: 1; min-width: 150px; padding: 14px 10px; background: none; border: none; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+    nav button.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    .subnav { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .subnav button { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: #fff; font-family: 'Sarabun', sans-serif; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+    .subnav button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .subpanel { display: none; }
+    .subpanel.active { display: block; }
+
+    main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+    .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+    label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+    input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Sarabun', sans-serif; font-size: 14px; background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 70px; }
+
+    button.btn { padding: 9px 16px; border-radius: 6px; border: none; background: var(--primary); color: #fff; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+    button.btn:hover { background: var(--primary-dark); }
+    button.btn.secondary { background: #475569; }
+    button.btn.danger { background: var(--danger); }
+    button.btn.success { background: var(--success); }
+    button.btn.small { padding: 6px 10px; font-size: 12px; }
+    button.btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    button.btn.full { width: 100%; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    th { color: var(--text-muted); font-weight: 600; font-size: 12px; }
+    .thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #e2e8f0; display: block; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge.temp { background: #fef3c7; color: #92400e; }
+    .badge.real { background: #dcfce7; color: #166534; }
+    .badge.role { background: #e0e7ff; color: #3730a3; }
+    .badge.type { background: #f1f5f9; color: #334155; }
+    .badge.status-pending { background: #fef3c7; color: #92400e; }
+    .badge.status-published { background: #dcfce7; color: #166534; }
+    .badge.status-none { background: #f1f5f9; color: #64748b; }
+    .badge.status-approved { background: #dcfce7; color: #166534; }
+    .badge.status-rejected { background: #fee2e2; color: #991b1b; }
+    .badge.status-waiting { background: #fef3c7; color: #92400e; }
+
+    .msg { padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+    .msg.success { background: #dcfce7; color: #166534; }
+    .msg.error { background: #fee2e2; color: #991b1b; }
+    .empty { color: var(--text-muted); font-size: 13px; padding: 16px 0; text-align: center; }
+    .hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .loading { font-size: 13px; color: var(--text-muted); }
+    .inline-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .inline-form input { width: 140px; }
+    .photo-preview { width: 110px; height: 110px; border-radius: 10px; object-fit: cover; background: #e2e8f0; display: block; margin-bottom: 10px; }
+    .divider { border-top: 1px solid var(--border); margin: 18px 0; }
+    .cf-field { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="loginScreen">
+    <div class="login-card">
+      <h1>ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน</h1>
+      <p class="sub">กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
+      <div id="loginMsg"></div>
+      <label>ชื่อผู้ใช้</label>
+      <input id="loginUsername" placeholder="username" autocomplete="username">
+      <br><br>
+      <label>รหัสผ่าน</label>
+      <input id="loginPassword" type="password" placeholder="password" autocomplete="current-password">
+      <br><br>
+      <button class="btn full" id="btnLogin">เข้าสู่ระบบ</button>
+      <p class="hint" style="text-align:center;margin-top:14px;">
+        นักเรียน: ใช้รหัสนักเรียน (จริง/ชั่วคราว) เป็นชื่อผู้ใช้ และเบอร์โทรเป็นรหัสผ่าน
+      </p>
+    </div>
+  </div>
+
+  <!-- ============ MAIN APP ============ -->
+  <div id="appScreen" style="display:none;">
+    <header>
+      <div class="title">
+        <h1>ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน</h1>
+        <p>Google Sheets + Google Drive</p>
+      </div>
+      <div class="userbox">
+        <span id="userLabel"></span>
+        <button id="btnLogout">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <nav id="tabNav"></nav>
+
+    <main>
+
+      <!-- ============ TAB: จัดการฟอร์มข้อมูล (admin) ============ -->
+      <section class="panel" id="panel-formbuilder">
+        <div class="card">
+          <h2 id="ffFormTitle">เพิ่มช่องข้อมูล</h2>
+          <div id="ffMsg"></div>
+          <div class="grid">
+            <div><label>ชื่อช่องข้อมูล *</label><input id="ffLabel" placeholder="เช่น ชื่อผู้ปกครอง"></div>
+            <div><label>ประเภทข้อมูล *</label>
+              <select id="ffType">
+                <option value="text">ข้อความทั่วไป</option>
+                <option value="number">ตัวเลข</option>
+                <option value="phone">เบอร์โทรศัพท์</option>
+                <option value="link">ลิงก์ (URL)</option>
+                <option value="dropdown">ดรอปดาวน์ (เลือกจากรายการ)</option>
+                <option value="image">รูปภาพ (อัปโหลดไฟล์)</option>
+                <option value="file">ไฟล์ (อัปโหลดไฟล์)</option>
+              </select>
+            </div>
+          </div>
+          <div id="ffOptionsWrap" style="display:none;margin-top:10px;">
+            <label>รายการตัวเลือก (1 บรรทัด = 1 ตัวเลือก)</label>
+            <textarea id="ffOptions" placeholder="เช่น&#10;ดีมาก&#10;ดี&#10;ปานกลาง"></textarea>
+          </div>
+          <br>
+          <button class="btn" id="btnSaveField">เพิ่มช่องข้อมูล</button>
+          <button class="btn secondary" id="btnCancelEditField" style="display:none;">ยกเลิก</button>
+        </div>
+
+        <div class="card">
+          <h2>ช่องข้อมูลที่มีอยู่</h2>
+          <button class="btn secondary small" id="btnRefreshFields">รีเฟรชรายการ</button>
+          <div id="ffList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: ลงทะเบียนนักเรียน (admin/teacher) ============ -->
+      <section class="panel" id="panel-register">
+        <div class="card">
+          <h2>① เพิ่มนักเรียนใหม่</h2>
+          <div id="addMsg"></div>
+          <div class="grid">
+            <div><label>ระดับชั้น *</label><select id="addGrade"></select></div>
+            <div><label>ห้อง *</label><select id="addRoom"></select></div>
+            <div><label>เบอร์โทรนักเรียน (ใช้เป็นรหัสผ่านล็อกอินของนักเรียน)</label><input id="addPhone"></div>
+            <div><label>รหัสนักเรียนจริง (ถ้ามี)</label><input id="addRealId"></div>
+          </div>
+          <div class="hint">ถ้าไม่กรอกรหัสนักเรียนจริง ระบบจะสร้าง "รหัสชั่วคราว" ให้อัตโนมัติ และใช้เป็นชื่อไฟล์รูป/ชื่อผู้ใช้ล็อกอินของนักเรียนไปก่อน<br>ต้องการเก็บชื่อ-นามสกุล หรือข้อมูลอื่นๆ เพิ่มเติม ให้ไปสร้างช่องข้อมูลที่แท็บ "จัดการฟอร์มข้อมูล" ก่อน แล้วจะมาแสดงต่อจากนี้อัตโนมัติ</div>
+
+          <div class="divider"></div>
+          <div id="addCustomFieldsWrap"><div class="hint">กำลังโหลดช่องข้อมูลเพิ่มเติม...</div></div>
+
+          <br>
+          <button class="btn" id="btnAddStudent">บันทึกนักเรียนใหม่</button>
+        </div>
+
+        <div class="card" id="newStudentPhotoCard" style="display:none;">
+          <h2>② อัปโหลดรูปให้ <span id="newStudentLabel"></span></h2>
+          <div id="newPhotoMsg"></div>
+          <input type="file" id="newPhotoFile" accept="image/*">
+          <div class="hint">รูปจะถูกเก็บไว้ใน "โฟลเดอร์ชั่วคราว" ก่อน — ยังไม่จัดเข้าโฟลเดอร์ระดับชั้น/ห้องจนกว่าแอดมินจะกด "เผยแพร่"</div>
+          <br>
+          <button class="btn" id="btnUploadNewPhoto">อัปโหลดรูป (เข้าโฟลเดอร์ชั่วคราว)</button>
+          <span id="newPhotoPreviewWrap" style="margin-left:14px;"></span>
+
+          <div id="newCustomFileFieldsWrap" style="margin-top:16px;"></div>
+        </div>
+
+        <div class="card">
+          <h2>หรือ: อัปโหลดรูปให้นักเรียนที่มีอยู่แล้ว (ยังไม่มีรูป)</h2>
+          <div class="inline-form">
+            <input id="noPhotoSearch" placeholder="ค้นหาชื่อ / รหัส...">
+            <button class="btn secondary small" id="btnNoPhotoSearch">ค้นหา</button>
+          </div>
+          <div id="noPhotoResults" style="margin-top:12px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการข้อมูล (admin/teacher) ============ -->
+      <section class="panel" id="panel-dataManage">
+        <div class="subnav" id="dataManageSubnav">
+          <button data-sub="searchEdit" class="active">ค้นหา/แก้ไขข้อมูล</button>
+          <button data-sub="confirm">ยืนยันรหัสจริง</button>
+          <button data-sub="move">ย้ายห้อง</button>
+        </div>
+
+        <!-- sub: ค้นหา/แก้ไขข้อมูล -->
+        <div class="subpanel active" id="sub-searchEdit">
+          <div class="card">
+            <h2>ค้นหา / รายชื่อนักเรียนทั้งหมด</h2>
+            <div class="grid">
+              <div><label>คำค้นหา (ชื่อ/รหัส)</label><input id="searchQuery" placeholder="พิมพ์เพื่อค้นหา..."></div>
+              <div><label>ระดับชั้น</label><select id="searchGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้อง</label><select id="searchRoom"><option value="">ทั้งหมด</option></select></div>
+            </div>
+            <br>
+            <button class="btn" id="btnSearch">ค้นหา</button>
+            <div id="searchResults" style="margin-top:16px;"></div>
+          </div>
+
+          <div class="card" id="editFormCard" style="display:none;">
+            <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
+            <div id="editMsg"></div>
+            <div class="grid">
+              <div><label>เบอร์โทร</label><input id="editPhone"></div>
+            </div>
+            <div class="divider"></div>
+            <div id="editCustomFieldsWrap"></div>
+            <br>
+            <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
+          </div>
+        </div>
+
+        <!-- sub: ยืนยันรหัสจริง -->
+        <div class="subpanel" id="sub-confirm">
+          <div class="card">
+            <h2>นักเรียนที่ยังใช้ "รหัสชั่วคราว" อยู่</h2>
+            <div class="hint">เมื่อทราบรหัสนักเรียนจริงแล้ว กรอกแล้วกด "ยืนยัน" — ระบบจะเปลี่ยนชื่อไฟล์รูปเดิม (ตำแหน่งเดิม) ให้เป็นรหัสจริงทันที</div>
+            <br>
+            <button class="btn secondary small" id="btnRefreshConfirm">รีเฟรชรายการ</button>
+            <div id="confirmList" style="margin-top:14px;"></div>
+          </div>
+        </div>
+
+        <!-- sub: ย้ายห้อง -->
+        <div class="subpanel" id="sub-move">
+          <div class="card">
+            <h2>ค้นหานักเรียนที่ต้องการย้ายห้อง</h2>
+            <div class="inline-form">
+              <input id="moveSearch" placeholder="ค้นหาชื่อ / รหัส...">
+              <button class="btn secondary small" id="btnMoveSearch">ค้นหา</button>
+            </div>
+            <div id="moveResults" style="margin-top:14px;"></div>
+          </div>
+
+          <div class="card" id="moveFormCard" style="display:none;">
+            <h2 id="moveFormTitle">ย้ายห้องให้ <span id="moveStudentLabel"></span></h2>
+            <div id="moveMsg"></div>
+            <p class="hint">ห้องปัจจุบัน: <b id="moveCurrentClass"></b></p>
+            <div class="grid">
+              <div><label>ระดับชั้นใหม่</label><select id="moveNewGrade"></select></div>
+              <div><label>ห้องใหม่</label><select id="moveNewRoom"></select></div>
+              <div id="moveDateWrap" style="display:none;"><label>วันที่ใหม่ (ไม่บังคับ ถ้าต้องการกำหนดใหม่)</label><input type="date" id="moveNewDate"></div>
+            </div>
+            <br>
+            <button class="btn" id="btnConfirmMove">ยืนยันการย้ายห้อง</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการข้อความ (admin) ============ -->
+      <section class="panel" id="panel-messages">
+        <div class="card">
+          <h2>คำขอย้ายห้อง / ลบ ที่รออนุมัติ</h2>
+          <button class="btn secondary small" id="btnRefreshRequests">รีเฟรชรายการ</button>
+          <div id="requestsMsg" style="margin-top:10px;"></div>
+          <div id="requestsList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: คำขอของฉัน (teacher) ============ -->
+      <section class="panel" id="panel-myRequests">
+        <div class="card">
+          <h2>คำขอที่ฉันส่งไป (ย้ายห้อง / ลบ)</h2>
+          <button class="btn secondary small" id="btnRefreshMyRequests">รีเฟรชรายการ</button>
+          <div id="myRequestsList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: การจัดส่งข้อมูล (admin) ============ -->
+      <section class="panel" id="panel-publish">
+        <div class="card">
+          <h2>รูปที่รออยู่ในโฟลเดอร์ชั่วคราว (รอเผยแพร่)</h2>
+          <div class="hint">เลือกรายการที่ต้องการเผยแพร่ ระบุวันที่กิจกรรม (ไม่บังคับ) แล้วกด "เผยแพร่"</div>
+          <br>
+          <button class="btn secondary small" id="btnRefreshPending">รีเฟรชรายการ</button>
+          <div id="pendingMsg" style="margin-top:10px;"></div>
+          <div id="pendingList" style="margin-top:14px;"></div>
+          <div class="divider"></div>
+          <div class="grid">
+            <div><label>วันที่กิจกรรม (ไม่ระบุ = ไม่มีโฟลเดอร์วันที่)</label><input type="date" id="publishDate"></div>
+          </div>
+          <br>
+          <button class="btn success" id="btnPublishSelected">เผยแพร่รายการที่เลือก</button>
+        </div>
+      </section>
+
+      <!-- ============ TAB: ข้อมูลของฉัน (student) ============ -->
+      <section class="panel" id="panel-student">
+        <div class="card">
+          <h2>ข้อมูลของฉัน</h2>
+          <div id="studentMsg"></div>
+          <div id="studentInfoBox">กำลังโหลด...</div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: ดาวน์โหลดข้อมูล (company) ============ -->
+      <section class="panel" id="panel-company">
+        <div class="card">
+          <h2>ค้นหาข้อมูลและรูปภาพนักเรียน</h2>
+          <div class="grid">
+            <div><label>วันที่กิจกรรม (ไม่ระบุ = ทุกวันที่)</label><input type="date" id="coDate"></div>
+            <div><label>ระดับชั้น</label><select id="coGrade"><option value="">ทั้งหมด</option></select></div>
+            <div><label>ห้อง</label><select id="coRoom"><option value="">ทั้งหมด</option></select></div>
+          </div>
+          <br>
+          <button class="btn" id="btnCoSearch">ค้นหา</button>
+          <div class="hint">ติ๊กเลือกรายการที่ต้องการ แล้วกดดาวน์โหลดด้านล่าง</div>
+          <div id="coResults" style="margin-top:16px;"></div>
+          <br>
+          <button class="btn secondary" id="btnCoDownload">ดาวน์โหลดรูปที่เลือก (ZIP + ข้อมูล CSV)</button>
+          <div id="coMsg" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: บัญชีของฉัน (admin/teacher/company) ============ -->
+      <section class="panel" id="panel-account">
+        <div class="card">
+          <h2>เปลี่ยนรหัสผ่านของฉัน</h2>
+          <div id="pwMsg"></div>
+          <div class="grid">
+            <div><label>รหัสผ่านเดิม</label><input type="password" id="pwOld"></div>
+            <div><label>รหัสผ่านใหม่</label><input type="password" id="pwNew"></div>
+          </div>
+          <br>
+          <button class="btn" id="btnChangePw">บันทึกรหัสผ่านใหม่</button>
+        </div>
+
+        <div class="card" id="adminUsersCard" style="display:none;">
+          <h2>จัดการบัญชีผู้ใช้งาน (ครู / บริษัท)</h2>
+          <div id="adminUsersMsg"></div>
+          <div id="adminUsersList">กำลังโหลด...</div>
+          <div class="divider"></div>
+          <h2>เพิ่มบัญชีใหม่</h2>
+          <div class="grid">
+            <div><label>บทบาท</label><select id="newUserRole"><option value="teacher">ครูที่ปรึกษา</option><option value="company">บริษัท</option><option value="admin">แอดมิน</option></select></div>
+            <div><label>Username</label><input id="newUserUsername"></div>
+            <div><label>Password</label><input id="newUserPassword"></div>
+            <div><label>ชื่อที่แสดง</label><input id="newUserDisplayName"></div>
+          </div>
+          <br>
+          <button class="btn" id="btnAddUser">เพิ่มบัญชี</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // ===================================================================
+    // 🔌 เชื่อมต่อกับ Apps Script ผ่าน fetch() (เพราะไฟล์นี้ฝากไว้บน GitHub Pages
+    //    ไม่ได้รันอยู่ "ใน" Apps Script เหมือนไฟล์ Index.html ตัวต้นฉบับ)
+    //
+    //    Shim นี้สร้าง google.script.run ปลอมขึ้นมาให้ใช้ syntax เดิมได้ทุกที่
+    //    (.withSuccessHandler().withFailureHandler().ชื่อฟังก์ชัน(args))
+    //    โดยเบื้องหลังจะยิง fetch() ไปคุยกับ Apps Script Web App จริงแทน
+    //    --> โค้ดส่วนที่เหลือทั้งหมดของไฟล์นี้ไม่ต้องแก้อะไรเลย ใช้ของเดิมได้ทุกบรรทัด
+    // ===================================================================
+
+    // ⚙️ แก้ URL นี้เป็น Web App URL ของคุณ ถ้า Deploy ใหม่แล้วได้ลิงก์เปลี่ยน (ปกติไม่ควรเปลี่ยนถ้าใช้ "New version")
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
+
+    async function callApi(action, args) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain เพื่อเลี่ยง CORS preflight
+        body: JSON.stringify({ action: action, args: args || [] })
+      });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง: ' + text.slice(0, 200)); }
+      if (!json.success) throw new Error(json.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ');
+      return json.data;
+    }
+
+    function createRunProxy_(successHandler, failureHandler) {
+      return new Proxy({}, {
+        get: function (target, prop) {
+          if (prop === 'withSuccessHandler') {
+            return function (fn) { return createRunProxy_(fn, failureHandler); };
+          }
+          if (prop === 'withFailureHandler') {
+            return function (fn) { return createRunProxy_(successHandler, fn); };
+          }
+          return function () {
+            const args = Array.prototype.slice.call(arguments);
+            callApi(prop, args)
+              .then(function (result) { if (successHandler) successHandler(result); })
+              .catch(function (err) { if (failureHandler) failureHandler(err); else console.error(prop, err); });
+          };
+        }
+      });
+    }
+
+    window.google = { script: { run: createRunProxy_() } };
+    // ===================================================================
+    // ↑↑↑ จบส่วนเชื่อมต่อ API — โค้ดด้านล่างทั้งหมดเหมือนเดิมทุกบรรทัด ↓↓↓
+    // ===================================================================
+
+    // ===================================================================
+    // ⚙️ แก้รายชื่อ "ระดับชั้น" และ "ห้อง" ที่ต้องการให้เลือกได้ที่นี่
+    // ===================================================================
+    const gradeOptions = [
+      'อนุบาล 1', 'อนุบาล 2', 'อนุบาล 3',
+      'ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6',
+      'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'
+    ];
+    const roomOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    // ===================================================================
+
+    let TOKEN = sessionStorage.getItem('sps_token') || null;
+    let ROLE = sessionStorage.getItem('sps_role') || null;
+    let DISPLAY_NAME = sessionStorage.getItem('sps_name') || null;
+    let MY_ID = sessionStorage.getItem('sps_id') || null;
+
+    let currentNewStudentId = null;
+    let currentMoveStudent = null;
+    let currentEditId = null;
+    let editingFieldId = null;
+    let formFields = [];
+
+    const FIELD_TYPE_LABELS = {
+      text: 'ข้อความทั่วไป', number: 'ตัวเลข', phone: 'เบอร์โทรศัพท์', link: 'ลิงก์ (URL)',
+      dropdown: 'ดรอปดาวน์', image: 'รูปภาพ', file: 'ไฟล์'
+    };
+
+    const TAB_LABELS = {
+      formbuilder: 'จัดการฟอร์มข้อมูล', register: 'ลงทะเบียนนักเรียน', dataManage: 'จัดการข้อมูล',
+      messages: 'จัดการข้อความ', myRequests: 'คำขอของฉัน', publish: 'การจัดส่งข้อมูล',
+      student: 'ข้อมูลของฉัน', company: 'ดาวน์โหลดข้อมูล', account: 'บัญชีของฉัน'
+    };
+    const ROLE_TABS = {
+      admin: ['formbuilder', 'register', 'dataManage', 'messages', 'publish', 'account'],
+      teacher: ['register', 'dataManage', 'myRequests', 'account'],
+      student: ['student'],
+      company: ['company', 'account']
+    };
+    const ROLE_THAI = { admin: 'ผู้ดูแลระบบ', teacher: 'ครูที่ปรึกษา', student: 'นักเรียน', company: 'บริษัท' };
+
+    // ---------------------------------------------------------------
+    // INIT dropdowns (ชั้น/ห้อง คงที่ ไม่ต้องรอ server)
+    // ---------------------------------------------------------------
+    fillSelect(document.getElementById('addGrade'), gradeOptions, null);
+    fillSelect(document.getElementById('addRoom'), roomOptions, null);
+    fillSelect(document.getElementById('moveNewGrade'), gradeOptions, null);
+    fillSelect(document.getElementById('moveNewRoom'), roomOptions, null);
+    fillSelect(document.getElementById('searchGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('searchRoom'), roomOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('coGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('coRoom'), roomOptions, 'ทั้งหมด');
+
+    if (TOKEN && ROLE) showApp();
+
+    function fillSelect(select, options, placeholder) {
+      select.innerHTML = '';
+      if (placeholder) { const o = document.createElement('option'); o.value = ''; o.textContent = placeholder; select.appendChild(o); }
+      options.forEach(function (v) { const o = document.createElement('option'); o.value = v; o.textContent = v; select.appendChild(o); });
+    }
+    function showMsg(elId, text, type) {
+      const el = document.getElementById(elId);
+      el.innerHTML = '<div class="msg ' + type + '">' + escapeHtml(text) + '</div>';
+      setTimeout(function () { el.innerHTML = ''; }, 5000);
+    }
+    function statusBadge(s) {
+      if (s.photoStatus === 'published') return '<span class="badge status-published">เผยแพร่แล้ว</span>';
+      if (s.photoStatus === 'pending') return '<span class="badge status-pending">รอเผยแพร่</span>';
+      return '<span class="badge status-none">ไม่มีรูป</span>';
+    }
+    function requestStatusBadge(status) {
+      if (status === 'อนุมัติแล้ว') return '<span class="badge status-approved">อนุมัติแล้ว</span>';
+      if (status === 'ปฏิเสธ') return '<span class="badge status-rejected">ปฏิเสธ</span>';
+      if (status === 'รออนุมัติ') return '<span class="badge status-waiting">รออนุมัติ</span>';
+      return '<span class="badge status-rejected">' + escapeHtml(status) + '</span>';
+    }
+    function badgeFor(s) {
+      return s.realId ? '<span class="badge real">' + escapeHtml(s.realId) + '</span>' : '<span class="badge temp">' + escapeHtml(s.tempId) + '</span>';
+    }
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+    }
+    function escapeJs(str) { return String(str || '').replace(/'/g, "\\'"); }
+    function fileToBase64(file, cb) {
+      const reader = new FileReader();
+      reader.onload = function () { cb(reader.result.split(',')[1]); };
+      reader.readAsDataURL(file);
+    }
+
+    // ---------------------------------------------------------------
+    // LOGIN / LOGOUT
+    // ---------------------------------------------------------------
+    document.getElementById('btnLogin').addEventListener('click', doLogin);
+    document.getElementById('loginPassword').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+
+    function doLogin() {
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!username || !password) { showMsg('loginMsg', 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน', 'error'); return; }
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+          TOKEN = res.token; ROLE = res.role; DISPLAY_NAME = res.displayName; MY_ID = res.studentId;
+          sessionStorage.setItem('sps_token', TOKEN);
+          sessionStorage.setItem('sps_role', ROLE);
+          sessionStorage.setItem('sps_name', DISPLAY_NAME);
+          if (MY_ID) sessionStorage.setItem('sps_id', MY_ID);
+          showApp();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+          showMsg('loginMsg', err.message, 'error');
+        })
+        .login(username, password);
+    }
+
+    document.getElementById('btnLogout').addEventListener('click', function () {
+      google.script.run.logout(TOKEN);
+      sessionStorage.clear();
+      TOKEN = null; ROLE = null;
+      document.getElementById('appScreen').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('loginUsername').value = '';
+      document.getElementById('loginPassword').value = '';
+    });
+
+    function handleAuthError(err) {
+      if (/เข้าสู่ระบบ|เซสชัน|สิทธิ์/.test(err.message)) {
+        alert(err.message + ' กรุณาเข้าสู่ระบบใหม่');
+        sessionStorage.clear();
+        document.getElementById('appScreen').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        return true;
+      }
+      return false;
+    }
+
+    // ---------------------------------------------------------------
+    // SHOW APP
+    // ---------------------------------------------------------------
+    function showApp() {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appScreen').style.display = 'block';
+      document.getElementById('userLabel').textContent = DISPLAY_NAME + ' (' + (ROLE_THAI[ROLE] || ROLE) + ')';
+      document.getElementById('adminUsersCard').style.display = (ROLE === 'admin') ? 'block' : 'none';
+      document.getElementById('moveDateWrap').style.display = (ROLE === 'admin') ? 'block' : 'none';
+
+      const nav = document.getElementById('tabNav');
+      nav.innerHTML = '';
+      const tabs = ROLE_TABS[ROLE] || [];
+      tabs.forEach(function (tab, i) {
+        const btn = document.createElement('button');
+        btn.textContent = TAB_LABELS[tab];
+        btn.dataset.tab = tab;
+        if (i === 0) btn.classList.add('active');
+        btn.addEventListener('click', function () { switchTab(tab); });
+        nav.appendChild(btn);
+      });
+
+      if (ROLE === 'admin' || ROLE === 'teacher') {
+        loadFormFieldsGlobal(function () {
+          renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
+        });
+      }
+
+      if (tabs.length) switchTab(tabs[0]);
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('#tabNav button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      const panel = document.getElementById('panel-' + tab);
+      if (panel) panel.classList.add('active');
+
+      if (tab === 'formbuilder') loadFormFieldsList();
+      if (tab === 'dataManage') switchSubTab('searchEdit');
+      if (tab === 'student') loadMyInfo();
+      if (tab === 'account') loadAccountTab();
+      if (tab === 'publish') loadPendingList();
+      if (tab === 'messages') loadRequestsList();
+      if (tab === 'myRequests') loadMyRequestsList();
+    }
+
+    document.querySelectorAll('#dataManageSubnav button').forEach(function (b) {
+      b.addEventListener('click', function () { switchSubTab(b.dataset.sub); });
+    });
+    function switchSubTab(sub) {
+      document.querySelectorAll('#dataManageSubnav button').forEach(function (b) { b.classList.toggle('active', b.dataset.sub === sub); });
+      document.querySelectorAll('.subpanel').forEach(function (p) { p.classList.remove('active'); });
+      const panel = document.getElementById('sub-' + sub);
+      if (panel) panel.classList.add('active');
+      if (sub === 'confirm') loadConfirmList();
+    }
+
+    // ===================================================================
+    // ฟิลด์ข้อมูลเพิ่มเติม (Custom Fields) — helper ใช้ร่วมกันหลายแท็บ
+    // ===================================================================
+    function fieldIsInline(f) { return f.type !== 'image' && f.type !== 'file'; }
+    function fieldIsFile(f) { return f.type === 'image' || f.type === 'file'; }
+
+    function loadFormFieldsGlobal(cb) {
+      google.script.run
+        .withSuccessHandler(function (fields) { formFields = fields; if (cb) cb(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) console.error(err); })
+        .getFormFields(TOKEN);
+    }
+
+    /** วาดช่อง input สำหรับฟิลด์ที่ไม่ใช่ไฟล์ (text/number/phone/link/dropdown) */
+    function renderCustomFieldInputs(containerId, fields, existingValues) {
+      existingValues = existingValues || {};
+      const container = document.getElementById(containerId);
+      if (!fields.length) { container.innerHTML = '<div class="hint">ยังไม่มีช่องข้อมูลเพิ่มเติม (ไปเพิ่มได้ที่แท็บ "จัดการฟอร์มข้อมูล")</div>'; return; }
+      let html = '';
+      fields.forEach(function (f) {
+        const val = existingValues[f.id] || '';
+        html += '<div class="cf-field"><label>' + escapeHtml(f.label) + '</label>';
+        if (f.type === 'dropdown') {
+          html += '<select class="cfInput" data-field="' + f.id + '"><option value="">- เลือก -</option>';
+          (f.options || []).forEach(function (opt) {
+            html += '<option value="' + escapeHtml(opt) + '"' + (val === opt ? ' selected' : '') + '>' + escapeHtml(opt) + '</option>';
+          });
+          html += '</select>';
+        } else {
+          const inputType = (f.type === 'number') ? 'number' : (f.type === 'phone' ? 'tel' : 'text');
+          html += '<input type="' + inputType + '" class="cfInput" data-field="' + f.id + '" value="' + escapeHtml(val) + '">';
+        }
+        html += '</div>';
+      });
+      container.innerHTML = html;
+    }
+    function collectCustomFieldValues(containerId) {
+      const obj = {};
+      document.querySelectorAll('#' + containerId + ' .cfInput').forEach(function (el) { obj[el.dataset.field] = el.value; });
+      return obj;
+    }
+
+    /** วาดช่องอัปโหลดไฟล์สำหรับฟิลด์ประเภท image/file (ใช้ตอนนักเรียนถูกสร้างแล้ว/แก้ไข) */
+    function renderCustomFileFields(containerId, fields, studentId, existingValues) {
+      existingValues = existingValues || {};
+      const fileFields = fields.filter(fieldIsFile);
+      const container = document.getElementById(containerId);
+      if (!fileFields.length) { container.innerHTML = ''; return; }
+      let html = '<div class="divider"></div><h3 style="font-size:14px;margin:0 0 10px;">ไฟล์/รูปเพิ่มเติม</h3>';
+      fileFields.forEach(function (f) {
+        const val = existingValues[f.id];
+        html += '<div class="cf-field" data-cffield="' + f.id + '"><label>' + escapeHtml(f.label) + '</label>';
+        if (val && val.url) {
+          html += (f.type === 'image')
+            ? '<img class="thumb" style="width:60px;height:60px;margin-bottom:6px;" src="' + val.url + '">'
+            : '<div class="hint">ไฟล์ปัจจุบัน: ' + escapeHtml(val.fileName || '') + '</div>';
+        }
+        html += '<input type="file" class="cfFileInput" data-field="' + f.id + '" data-student="' + studentId + '">' +
+          ' <button class="btn small" type="button" onclick="uploadCustomFile(\'' + studentId + '\',\'' + f.id + '\', this)">อัปโหลด</button>' +
+          '<span class="cfFileStatus" data-field="' + f.id + '"></span></div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function uploadCustomFile(studentId, fieldId, btnEl) {
+      const input = document.querySelector('.cfFileInput[data-field="' + fieldId + '"][data-student="' + studentId + '"]');
+      if (!input.files.length) { alert('กรุณาเลือกไฟล์ก่อน'); return; }
+      const file = input.files[0];
+      btnEl.disabled = true; btnEl.textContent = 'กำลังอัปโหลด...';
+      fileToBase64(file, function (base64) {
+        google.script.run
+          .withSuccessHandler(function () {
+            btnEl.disabled = false; btnEl.textContent = 'อัปโหลด';
+            const status = document.querySelector('.cfFileStatus[data-field="' + fieldId + '"]');
+            if (status) status.textContent = ' สำเร็จ ✓';
+          })
+          .withFailureHandler(function (err) {
+            btnEl.disabled = false; btnEl.textContent = 'อัปโหลด';
+            if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+          })
+          .uploadCustomFieldFile(TOKEN, studentId, fieldId, base64, file.type, file.name);
+      });
+    }
+
+    // ===================================================================
+    // TAB: จัดการฟอร์มข้อมูล (admin)
+    // ===================================================================
+    document.getElementById('ffType').addEventListener('change', function () {
+      document.getElementById('ffOptionsWrap').style.display = (this.value === 'dropdown') ? 'block' : 'none';
+    });
+
+    function loadFormFieldsList() {
+      const container = document.getElementById('ffList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(function (fields) { formFields = fields; renderFormFieldsList(fields); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getFormFields(TOKEN);
+    }
+    document.getElementById('btnRefreshFields').addEventListener('click', loadFormFieldsList);
+
+    function renderFormFieldsList(fields) {
+      const container = document.getElementById('ffList');
+      if (!fields.length) { container.innerHTML = '<div class="empty">ยังไม่มีช่องข้อมูลเพิ่มเติม</div>'; return; }
+      let html = '<table><tr><th>ลำดับ</th><th></th><th>ชื่อช่อง</th><th>ประเภท</th><th>ตัวเลือก</th><th></th></tr>';
+      fields.forEach(function (f, idx) {
+        const upDisabled = (idx === 0) ? 'disabled' : '';
+        const downDisabled = (idx === fields.length - 1) ? 'disabled' : '';
+        html += '<tr>' +
+          '<td>' + escapeHtml(f.order) + '</td>' +
+          '<td>' +
+            '<button class="btn small secondary" ' + upDisabled + ' onclick="moveField(\'' + escapeJs(f.id) + '\',\'up\')" title="เลื่อนขึ้น">▲</button> ' +
+            '<button class="btn small secondary" ' + downDisabled + ' onclick="moveField(\'' + escapeJs(f.id) + '\',\'down\')" title="เลื่อนลง">▼</button>' +
+          '</td>' +
+          '<td>' + escapeHtml(f.label) + '</td>' +
+          '<td><span class="badge type">' + escapeHtml(FIELD_TYPE_LABELS[f.type] || f.type) + '</span></td>' +
+          '<td>' + (f.options && f.options.length ? escapeHtml(f.options.join(', ')) : '-') + '</td>' +
+          '<td>' +
+            '<button class="btn small" onclick="editField(\'' + escapeJs(f.id) + '\')">แก้ไข</button> ' +
+            '<button class="btn small danger" onclick="deleteField(\'' + escapeJs(f.id) + '\')">ลบ</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function moveField(fieldId, direction) {
+      google.script.run
+        .withSuccessHandler(function () { loadFormFieldsList(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminMoveFormField(TOKEN, fieldId, direction);
+    }
+
+    function editField(fieldId) {
+      const f = formFields.filter(function (x) { return x.id === fieldId; })[0];
+      if (!f) return;
+      editingFieldId = fieldId;
+      document.getElementById('ffFormTitle').textContent = 'แก้ไขช่องข้อมูล: ' + f.label;
+      document.getElementById('ffLabel').value = f.label;
+      document.getElementById('ffType').value = f.type;
+      document.getElementById('ffOptionsWrap').style.display = (f.type === 'dropdown') ? 'block' : 'none';
+      document.getElementById('ffOptions').value = (f.options || []).join('\n');
+      document.getElementById('btnSaveField').textContent = 'บันทึกการแก้ไข';
+      document.getElementById('btnCancelEditField').style.display = 'inline-block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.getElementById('btnCancelEditField').addEventListener('click', resetFieldForm);
+    function resetFieldForm() {
+      editingFieldId = null;
+      document.getElementById('ffFormTitle').textContent = 'เพิ่มช่องข้อมูล';
+      document.getElementById('ffLabel').value = '';
+      document.getElementById('ffType').value = 'text';
+      document.getElementById('ffOptionsWrap').style.display = 'none';
+      document.getElementById('ffOptions').value = '';
+      document.getElementById('btnSaveField').textContent = 'เพิ่มช่องข้อมูล';
+      document.getElementById('btnCancelEditField').style.display = 'none';
+    }
+
+    document.getElementById('btnSaveField').addEventListener('click', function () {
+      const label = document.getElementById('ffLabel').value.trim();
+      const type = document.getElementById('ffType').value;
+      const options = document.getElementById('ffOptions').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!label) { showMsg('ffMsg', 'กรุณาระบุชื่อช่องข้อมูล', 'error'); return; }
+      if (type === 'dropdown' && !options.length) { showMsg('ffMsg', 'กรุณาเพิ่มรายการตัวเลือกอย่างน้อย 1 รายการ', 'error'); return; }
+
+      const btn = document.getElementById('btnSaveField');
+      btn.disabled = true;
+      const isEdit = !!editingFieldId;
+      const call = isEdit
+        ? google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminUpdateFormField(TOKEN, editingFieldId, label, type, options)
+        : google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminAddFormField(TOKEN, label, type, options);
+
+      function onSaved() {
+        btn.disabled = false;
+        showMsg('ffMsg', isEdit ? 'บันทึกการแก้ไขสำเร็จ' : 'เพิ่มช่องข้อมูลสำเร็จ', 'success');
+        resetFieldForm();
+        loadFormFieldsList();
+      }
+      function onFail(err) {
+        btn.disabled = false;
+        if (!handleAuthError(err)) showMsg('ffMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+      }
+    });
+
+    function deleteField(fieldId) {
+      if (!confirm('ยืนยันลบช่องข้อมูลนี้? (ข้อมูลที่กรอกไว้แล้วของนักเรียนจะไม่แสดงอีกต่อไป)')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadFormFieldsList(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteFormField(TOKEN, fieldId);
+    }
+
+    // ===================================================================
+    // TAB: ลงทะเบียนนักเรียน (admin/teacher)
+    // ===================================================================
+    document.getElementById('btnAddStudent').addEventListener('click', function () {
+      const info = {
+        grade: document.getElementById('addGrade').value,
+        room: document.getElementById('addRoom').value,
+        phone: document.getElementById('addPhone').value.trim(),
+        realId: document.getElementById('addRealId').value.trim(),
+        customValues: collectCustomFieldValues('addCustomFieldsWrap')
+      };
+      if (!info.grade || !info.room) { showMsg('addMsg', 'กรุณาเลือก ระดับชั้น และ ห้อง ให้ครบ', 'error'); return; }
+      const btn = document.getElementById('btnAddStudent');
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
+          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId, 'success');
+          currentNewStudentId = res.id;
+          document.getElementById('newStudentLabel').textContent = info.realId || res.tempId;
+          document.getElementById('newStudentPhotoCard').style.display = 'block';
+          renderCustomFileFields('newCustomFileFieldsWrap', formFields, currentNewStudentId, {});
+          document.getElementById('newStudentPhotoCard').scrollIntoView({ behavior: 'smooth' });
+          ['addPhone', 'addRealId'].forEach(function (id) { document.getElementById(id).value = ''; });
+          renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
+          if (!handleAuthError(err)) showMsg('addMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .addStudent(TOKEN, info);
+    });
+
+    document.getElementById('btnUploadNewPhoto').addEventListener('click', function () {
+      const fileInput = document.getElementById('newPhotoFile');
+      if (!fileInput.files.length) { showMsg('newPhotoMsg', 'กรุณาเลือกไฟล์รูปก่อน', 'error'); return; }
+      if (!currentNewStudentId) { showMsg('newPhotoMsg', 'ไม่พบรายการนักเรียน กรุณาบันทึกนักเรียนใหม่ก่อน', 'error'); return; }
+      const file = fileInput.files[0];
+      const btn = document.getElementById('btnUploadNewPhoto');
+      btn.disabled = true; btn.textContent = 'กำลังอัปโหลด...';
+      fileToBase64(file, function (base64) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            btn.disabled = false; btn.textContent = 'อัปโหลดรูป (เข้าโฟลเดอร์ชั่วคราว)';
+            showMsg('newPhotoMsg', 'อัปโหลดสำเร็จ (รอเผยแพร่) ชื่อไฟล์: ' + res.fileName, 'success');
+            document.getElementById('newPhotoPreviewWrap').innerHTML = '<img class="thumb" style="width:60px;height:60px" src="' + res.photoUrl + '">';
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false; btn.textContent = 'อัปโหลดรูป (เข้าโฟลเดอร์ชั่วคราว)';
+            if (!handleAuthError(err)) showMsg('newPhotoMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          })
+          .uploadPhotoForStudent(TOKEN, currentNewStudentId, base64, file.type, file.name);
+      });
+    });
+
+    document.getElementById('btnNoPhotoSearch').addEventListener('click', function () {
+      const q = document.getElementById('noPhotoSearch').value.trim();
+      const container = document.getElementById('noPhotoResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderNoPhotoResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, { query: q, onlyNoPhoto: true });
+    });
+
+    function renderNoPhotoResults(list) {
+      const container = document.getElementById('noPhotoResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ (หรือทุกคนมีรูปแล้ว)</div>'; return; }
+      let html = '<table><tr><th>รหัสที่ใช้</th><th>ชั้น/ห้อง</th><th>อัปโหลดรูป</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td><input type="file" accept="image/*" class="npFile" data-id="' + s.id + '" style="max-width:150px;display:inline-block">' +
+          '<button class="btn small" onclick="uploadNoPhoto(\'' + escapeJs(s.id) + '\', this)">อัปโหลด</button></td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function uploadNoPhoto(id, btnEl) {
+      const fileInput = document.querySelector('.npFile[data-id="' + id + '"]');
+      if (!fileInput.files.length) { alert('กรุณาเลือกไฟล์รูปก่อน'); return; }
+      const file = fileInput.files[0];
+      btnEl.disabled = true; btnEl.textContent = 'กำลังอัปโหลด...';
+      fileToBase64(file, function (base64) {
+        google.script.run
+          .withSuccessHandler(function () {
+            btnEl.textContent = 'สำเร็จ ✓ (รอเผยแพร่)';
+            setTimeout(function () { document.getElementById('btnNoPhotoSearch').click(); }, 1000);
+          })
+          .withFailureHandler(function (err) {
+            btnEl.disabled = false; btnEl.textContent = 'อัปโหลด';
+            if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+          })
+          .uploadPhotoForStudent(TOKEN, id, base64, file.type, file.name);
+      });
+    }
+
+    // ===================================================================
+    // TAB: จัดการข้อมูล > ค้นหา/แก้ไขข้อมูล (admin/teacher)
+    // ===================================================================
+    document.getElementById('btnSearch').addEventListener('click', function () {
+      const filter = {
+        query: document.getElementById('searchQuery').value.trim(),
+        grade: document.getElementById('searchGrade').value,
+        room: document.getElementById('searchRoom').value
+      };
+      const container = document.getElementById('searchResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderSearchResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, filter);
+    });
+
+    let lastSearchResults = [];
+    function renderSearchResults(list) {
+      lastSearchResults = list;
+      const container = document.getElementById('searchResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
+      const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
+      let html = '<table><tr><th>รูป</th><th>รหัส</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + statusBadge(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td>' +
+            '<button class="btn small" onclick="openEdit(\'' + escapeJs(s.id) + '\')">แก้ไข</button> ' +
+            '<button class="btn small danger" onclick="deleteRow(\'' + escapeJs(s.id) + '\', this)">' + delLabel + '</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function deleteRow(id, btnEl) {
+      const isAdmin = (ROLE === 'admin');
+      const confirmMsg = isAdmin ? 'ยืนยันลบนักเรียนรายนี้? (รูปจะถูกย้ายลงถังขยะใน Drive)' : 'ยืนยันส่งคำขอลบนักเรียนรายนี้ให้แอดมินอนุมัติ?';
+      if (!confirm(confirmMsg)) return;
+      const fn = isAdmin ? 'deleteStudent' : 'teacherRequestDelete';
+      google.script.run
+        .withSuccessHandler(function () {
+          if (isAdmin) { document.getElementById('btnSearch').click(); }
+          else { btnEl.textContent = 'ส่งคำขอแล้ว ✓'; btnEl.disabled = true; }
+        })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        [fn](TOKEN, id);
+    }
+
+    function openEdit(id) {
+      const s = lastSearchResults.filter(function (x) { return x.id === id; })[0];
+      if (!s) return;
+      currentEditId = id;
+      document.getElementById('editStudentLabel').textContent = s.activeCode;
+      document.getElementById('editPhone').value = s.phone;
+      renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields);
+      renderCustomFileFields('editCustomFieldsWrap', formFields, id, s.customFields);
+      document.getElementById('editFormCard').style.display = 'block';
+      document.getElementById('editFormCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btnSaveEdit').addEventListener('click', function () {
+      if (!currentEditId) return;
+      const info = {
+        phone: document.getElementById('editPhone').value.trim(),
+        customValues: collectCustomFieldValues('editCustomFieldsWrap')
+      };
+      const btn = document.getElementById('btnSaveEdit');
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
+          showMsg('editMsg', 'บันทึกสำเร็จ', 'success');
+          document.getElementById('btnSearch').click();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
+          if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .updateStudentInfo(TOKEN, currentEditId, info);
+    });
+
+    // ===================================================================
+    // TAB: จัดการข้อมูล > ยืนยันรหัสจริง (admin/teacher)
+    // ===================================================================
+    function loadConfirmList() {
+      const container = document.getElementById('confirmList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderConfirmList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, { onlyTemp: true });
+    }
+    document.getElementById('btnRefreshConfirm').addEventListener('click', loadConfirmList);
+
+    function renderConfirmList(list) {
+      const container = document.getElementById('confirmList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีนักเรียนที่ใช้รหัสชั่วคราวอยู่ ✓</div>'; return; }
+      let html = '<table><tr><th>รูป</th><th>รหัสชั่วคราว</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>กรอกรหัสจริง</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td><span class="badge temp">' + escapeHtml(s.tempId) + '</span></td>' +
+          '<td>' + statusBadge(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td class="inline-form"><input type="text" class="realIdInput" data-id="' + s.id + '" placeholder="รหัสนักเรียนจริง">' +
+          '<button class="btn small" onclick="confirmReal(\'' + escapeJs(s.id) + '\', this)">ยืนยัน</button></td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function confirmReal(id, btnEl) {
+      const input = document.querySelector('.realIdInput[data-id="' + id + '"]');
+      const val = input.value.trim();
+      if (!val) { alert('กรุณากรอกรหัสนักเรียนจริง'); return; }
+      btnEl.disabled = true; btnEl.textContent = '...';
+      google.script.run
+        .withSuccessHandler(function () { loadConfirmList(); })
+        .withFailureHandler(function (err) {
+          btnEl.disabled = false; btnEl.textContent = 'ยืนยัน';
+          if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+        })
+        .confirmRealId(TOKEN, id, val);
+    }
+
+    // ===================================================================
+    // TAB: จัดการข้อมูล > ย้ายห้อง (admin: ทันที / teacher: แจ้งคำขอ)
+    // ===================================================================
+    document.getElementById('btnMoveSearch').addEventListener('click', function () {
+      const q = document.getElementById('moveSearch').value.trim();
+      const container = document.getElementById('moveResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderMoveResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, { query: q });
+    });
+
+    function renderMoveResults(list) {
+      const container = document.getElementById('moveResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
+      let html = '<table><tr><th>รูป</th><th>รหัส</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\', \'' +
+            escapeJs(s.activeCode) + '\', \'' +
+            escapeJs(s.grade) + '\', \'' + escapeJs(s.room) + '\')">เลือกย้าย</button></td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function selectMoveStudent(id, label, grade, room) {
+      currentMoveStudent = { id: id, grade: grade, room: room };
+      document.getElementById('moveStudentLabel').textContent = label;
+      document.getElementById('moveCurrentClass').textContent = grade + ' / ห้อง ' + room;
+      document.getElementById('moveFormTitle').innerHTML =
+        (ROLE === 'admin' ? 'ย้ายห้องให้ ' : 'แจ้งย้ายห้องให้ ') + '<span id="moveStudentLabel2">' + escapeHtml(label) + '</span>';
+      document.getElementById('btnConfirmMove').textContent = (ROLE === 'admin') ? 'ยืนยันการย้ายห้อง' : 'แจ้งย้ายห้อง (รออนุมัติจากแอดมิน)';
+      document.getElementById('moveFormCard').style.display = 'block';
+      document.getElementById('moveFormCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btnConfirmMove').addEventListener('click', function () {
+      const newGrade = document.getElementById('moveNewGrade').value;
+      const newRoom = document.getElementById('moveNewRoom').value;
+      if (!newGrade || !newRoom) { showMsg('moveMsg', 'กรุณาเลือกระดับชั้นและห้องใหม่', 'error'); return; }
+      if (!currentMoveStudent) return;
+      const btn = document.getElementById('btnConfirmMove');
+      const originalLabel = btn.textContent;
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+
+      if (ROLE === 'admin') {
+        const newDate = document.getElementById('moveNewDate').value;
+        google.script.run
+          .withSuccessHandler(function () {
+            btn.disabled = false; btn.textContent = originalLabel;
+            showMsg('moveMsg', 'ย้ายห้องสำเร็จ!', 'success');
+            document.getElementById('moveCurrentClass').textContent = newGrade + ' / ห้อง ' + newRoom;
+            document.getElementById('btnMoveSearch').click();
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false; btn.textContent = originalLabel;
+            if (!handleAuthError(err)) showMsg('moveMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          })
+          .moveStudentClass(TOKEN, currentMoveStudent.id, newGrade, newRoom, newDate);
+      } else {
+        google.script.run
+          .withSuccessHandler(function () {
+            btn.disabled = false; btn.textContent = originalLabel;
+            showMsg('moveMsg', 'ส่งคำขอย้ายห้องแล้ว รอแอดมินอนุมัติ', 'success');
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false; btn.textContent = originalLabel;
+            if (!handleAuthError(err)) showMsg('moveMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          })
+          .teacherRequestMove(TOKEN, currentMoveStudent.id, newGrade, newRoom);
+      }
+    });
+
+    // ===================================================================
+    // TAB: จัดการข้อความ (admin) — อนุมัติ/ปฏิเสธ พร้อมข้อความตอบกลับ
+    // ===================================================================
+    function loadRequestsList() {
+      const container = document.getElementById('requestsList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderRequestsList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .adminListRequests(TOKEN);
+    }
+    document.getElementById('btnRefreshRequests').addEventListener('click', loadRequestsList);
+
+    function renderRequestsList(list) {
+      const container = document.getElementById('requestsList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>'; return; }
+      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>วันที่ใหม่ (ถ้าย้าย)</th><th>ข้อความตอบกลับ</th><th>ดำเนินการ</th></tr>';
+      list.forEach(function (r) {
+        const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
+        html += '<tr>' +
+          '<td>' + escapeHtml(r.type) + '</td>' +
+          '<td>' + escapeHtml(r.studentName) + '</td>' +
+          '<td>' + escapeHtml(detailTxt) + '</td>' +
+          '<td>' + escapeHtml(r.requestedBy) + '</td>' +
+          '<td>' + escapeHtml(r.requestedAt) + '</td>' +
+          '<td>' + (r.type === 'ย้ายห้อง' ? '<input type="date" class="reqDate" data-row="' + r.requestRow + '" style="width:140px">' : '-') + '</td>' +
+          '<td><input type="text" class="reqReply" data-row="' + r.requestRow + '" placeholder="ข้อความถึงครู (ไม่บังคับ)" style="width:160px"></td>' +
+          '<td>' +
+            '<button class="btn small success" onclick="handleRequest(' + r.requestRow + ', \'approve\', this)">อนุมัติ</button> ' +
+            '<button class="btn small danger" onclick="handleRequest(' + r.requestRow + ', \'reject\', this)">ปฏิเสธ</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function handleRequest(requestRow, decision, btnEl) {
+      const dateInput = document.querySelector('.reqDate[data-row="' + requestRow + '"]');
+      const replyInput = document.querySelector('.reqReply[data-row="' + requestRow + '"]');
+      const photoDate = dateInput ? dateInput.value : '';
+      const replyMessage = replyInput ? replyInput.value.trim() : '';
+      btnEl.closest('td').querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+      google.script.run
+        .withSuccessHandler(function () {
+          showMsg('requestsMsg', decision === 'approve' ? 'อนุมัติคำขอแล้ว' : 'ปฏิเสธคำขอแล้ว', 'success');
+          loadRequestsList();
+        })
+        .withFailureHandler(function (err) {
+          if (!handleAuthError(err)) showMsg('requestsMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          loadRequestsList();
+        })
+        .adminHandleRequest(TOKEN, requestRow, decision, photoDate, replyMessage);
+    }
+
+    // ===================================================================
+    // TAB: คำขอของฉัน (teacher)
+    // ===================================================================
+    function loadMyRequestsList() {
+      const container = document.getElementById('myRequestsList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderMyRequestsList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getMyRequests(TOKEN);
+    }
+    document.getElementById('btnRefreshMyRequests').addEventListener('click', loadMyRequestsList);
+
+    function renderMyRequestsList(list) {
+      const container = document.getElementById('myRequestsList');
+      if (!list.length) { container.innerHTML = '<div class="empty">คุณยังไม่ได้ส่งคำขอใดๆ</div>'; return; }
+      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>วันที่ขอ</th><th>สถานะ</th><th>ข้อความตอบกลับจากแอดมิน</th></tr>';
+      list.forEach(function (r) {
+        const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
+        html += '<tr>' +
+          '<td>' + escapeHtml(r.type) + '</td>' +
+          '<td>' + escapeHtml(r.studentName) + '</td>' +
+          '<td>' + escapeHtml(detailTxt) + '</td>' +
+          '<td>' + escapeHtml(r.requestedAt) + '</td>' +
+          '<td>' + requestStatusBadge(r.status) + '</td>' +
+          '<td>' + (r.replyMessage ? escapeHtml(r.replyMessage) : '<span class="hint">-</span>') + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    // ===================================================================
+    // TAB: การจัดส่งข้อมูล (admin)
+    // ===================================================================
+    function loadPendingList() {
+      const container = document.getElementById('pendingList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderPendingList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listPendingPhotos(TOKEN);
+    }
+    document.getElementById('btnRefreshPending').addEventListener('click', loadPendingList);
+
+    function renderPendingList(list) {
+      const container = document.getElementById('pendingList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีรูปที่รอเผยแพร่</div>'; return; }
+      let html = '<table><tr><th><input type="checkbox" id="pendingSelectAll"></th><th>รูป</th><th>รหัส</th><th>ชั้น/ห้อง</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td><input type="checkbox" class="pendingChk" value="' + s.id + '"></td>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      document.getElementById('pendingSelectAll').addEventListener('change', function (e) {
+        document.querySelectorAll('.pendingChk').forEach(function (c) { c.checked = e.target.checked; });
+      });
+    }
+
+    document.getElementById('btnPublishSelected').addEventListener('click', function () {
+      const ids = Array.prototype.map.call(document.querySelectorAll('.pendingChk:checked'), function (c) { return c.value; });
+      if (!ids.length) { showMsg('pendingMsg', 'กรุณาเลือกรายการที่ต้องการเผยแพร่อย่างน้อย 1 รายการ', 'error'); return; }
+      const date = document.getElementById('publishDate').value;
+      const btn = document.getElementById('btnPublishSelected');
+      btn.disabled = true; btn.textContent = 'กำลังเผยแพร่...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
+          showMsg('pendingMsg', 'เผยแพร่สำเร็จ ' + res.count + ' รายการ', 'success');
+          loadPendingList();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
+          if (!handleAuthError(err)) showMsg('pendingMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .publishPhotos(TOKEN, ids, date);
+    });
+
+    // ===================================================================
+    // TAB: ข้อมูลของฉัน (student)
+    // ===================================================================
+    function loadMyInfo() {
+      const box = document.getElementById('studentInfoBox');
+      box.innerHTML = 'กำลังโหลด...';
+      google.script.run
+        .withSuccessHandler(renderMyInfo)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getMyInfo(TOKEN);
+    }
+
+    function renderMyInfo(s) {
+      const box = document.getElementById('studentInfoBox');
+      box.innerHTML =
+        (s.photoUrl ? '<img class="photo-preview" src="' + s.photoUrl + '">' : '<div class="photo-preview"></div>') +
+        '<p>รหัสนักเรียน: ' + badgeFor(s) + ' &nbsp; สถานะรูป: ' + statusBadge(s) + '</p>' +
+        '<p>ระดับชั้น/ห้อง: ' + escapeHtml(s.grade + ' / ' + s.room) + '</p>' +
+        '<div class="hint">การเปลี่ยนรูปต้องให้ครูที่ปรึกษาหรือแอดมินดำเนินการให้</div>' +
+        '<div class="divider"></div>' +
+        '<label>เบอร์โทร (ใช้เป็นรหัสผ่านล็อกอินของฉันด้วย)</label>' +
+        '<input id="myPhone" value="' + escapeHtml(s.phone) + '">' +
+        '<br><br><button class="btn" id="btnSaveMyPhone">บันทึกเบอร์โทร</button>';
+
+      document.getElementById('btnSaveMyPhone').addEventListener('click', function () {
+        const phone = document.getElementById('myPhone').value.trim();
+        google.script.run
+          .withSuccessHandler(function () { showMsg('studentMsg', 'บันทึกเบอร์โทรสำเร็จ', 'success'); })
+          .withFailureHandler(function (err) { if (!handleAuthError(err)) showMsg('studentMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+          .updateStudentInfo(TOKEN, MY_ID, { phone: phone });
+      });
+    }
+
+    // ===================================================================
+    // TAB: ดาวน์โหลดข้อมูล (company)
+    // ===================================================================
+    function getCoFilters() {
+      return { date: document.getElementById('coDate').value, grade: document.getElementById('coGrade').value, room: document.getElementById('coRoom').value };
+    }
+
+    document.getElementById('btnCoSearch').addEventListener('click', function () {
+      const container = document.getElementById('coResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderCoResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .companySearchStudents(TOKEN, getCoFilters());
+    });
+
+    function renderCoResults(list) {
+      const container = document.getElementById('coResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการตามเงื่อนไข</div>'; return; }
+      let html = '<table><tr><th><input type="checkbox" id="coSelectAll"></th><th>รูป</th><th>รหัส</th><th>ชั้น/ห้อง</th><th>วันที่</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td><input type="checkbox" class="coChk" value="' + s.id + '"></td>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td>' + escapeHtml(s.photoDate || '-') + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      document.getElementById('coSelectAll').addEventListener('change', function (e) {
+        document.querySelectorAll('.coChk').forEach(function (c) { c.checked = e.target.checked; });
+      });
+    }
+
+    document.getElementById('btnCoDownload').addEventListener('click', function () {
+      const ids = Array.prototype.map.call(document.querySelectorAll('.coChk:checked'), function (c) { return c.value; });
+      if (!ids.length) { showMsg('coMsg', 'กรุณาติ๊กเลือกรูปที่ต้องการดาวน์โหลดอย่างน้อย 1 รายการ', 'error'); return; }
+      const btn = document.getElementById('btnCoDownload');
+      btn.disabled = true; btn.textContent = 'กำลังเตรียมไฟล์...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'ดาวน์โหลดรูปที่เลือก (ZIP + ข้อมูล CSV)';
+          downloadBase64File(res.base64, res.filename, 'application/zip');
+          showMsg('coMsg', 'ดาวน์โหลดไฟล์ ' + res.filename + ' แล้ว (' + ids.length + ' รายการ)', 'success');
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'ดาวน์โหลดรูปที่เลือก (ZIP + ข้อมูล CSV)';
+          if (!handleAuthError(err)) showMsg('coMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .companyDownloadSelected(TOKEN, ids);
+    });
+
+    function downloadBase64File(base64, filename, mime) {
+      const byteChars = atob(base64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mime || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ===================================================================
+    // TAB: บัญชีของฉัน (admin/teacher/company)
+    // ===================================================================
+    document.getElementById('btnChangePw').addEventListener('click', function () {
+      const oldPw = document.getElementById('pwOld').value;
+      const newPw = document.getElementById('pwNew').value;
+      if (!oldPw || !newPw) { showMsg('pwMsg', 'กรุณากรอกให้ครบ', 'error'); return; }
+      const btn = document.getElementById('btnChangePw');
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'บันทึกรหัสผ่านใหม่';
+          showMsg('pwMsg', 'เปลี่ยนรหัสผ่านสำเร็จ', 'success');
+          document.getElementById('pwOld').value = ''; document.getElementById('pwNew').value = '';
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'บันทึกรหัสผ่านใหม่';
+          if (!handleAuthError(err)) showMsg('pwMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .changeOwnPassword(TOKEN, oldPw, newPw);
+    });
+
+    function loadAccountTab() {
+      if (ROLE !== 'admin') return;
+      const box = document.getElementById('adminUsersList');
+      box.innerHTML = 'กำลังโหลด...';
+      google.script.run
+        .withSuccessHandler(renderAdminUsers)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .adminListUsers(TOKEN);
+    }
+
+    function renderAdminUsers(list) {
+      const box = document.getElementById('adminUsersList');
+      let html = '<table><tr><th>บทบาท</th><th>Username</th><th>Username ใหม่</th><th>รหัสผ่านใหม่</th><th></th></tr>';
+      list.forEach(function (u) {
+        html += '<tr>' +
+          '<td><span class="badge role">' + escapeHtml(ROLE_THAI[u.role] || u.role) + '</span></td>' +
+          '<td>' + escapeHtml(u.username) + '</td>' +
+          '<td><input type="text" class="auNewUser" data-username="' + escapeHtml(u.username) + '" placeholder="(ไม่เปลี่ยนเว้นว่าง)"></td>' +
+          '<td><input type="text" class="auNewPass" data-username="' + escapeHtml(u.username) + '" placeholder="(ไม่เปลี่ยนเว้นว่าง)"></td>' +
+          '<td>' +
+            '<button class="btn small" onclick="saveCredential(\'' + escapeJs(u.username) + '\', this)">บันทึก</button> ' +
+            '<button class="btn small danger" onclick="deleteUser(\'' + escapeJs(u.username) + '\')">ลบบัญชี</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      box.innerHTML = html;
+    }
+
+    function saveCredential(username, btnEl) {
+      const newUser = document.querySelector('.auNewUser[data-username="' + username + '"]').value.trim();
+      const newPass = document.querySelector('.auNewPass[data-username="' + username + '"]').value.trim();
+      if (!newUser && !newPass) { alert('กรุณากรอก username หรือ password ใหม่อย่างน้อย 1 อย่าง'); return; }
+      btnEl.disabled = true; btnEl.textContent = '...';
+      google.script.run
+        .withSuccessHandler(function () { showMsg('adminUsersMsg', 'บันทึกสำเร็จ', 'success'); loadAccountTab(); })
+        .withFailureHandler(function (err) {
+          btnEl.disabled = false; btnEl.textContent = 'บันทึก';
+          if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+        })
+        .adminUpdateCredential(TOKEN, username, newUser, newPass);
+    }
+
+    function deleteUser(username) {
+      if (!confirm('ยืนยันลบบัญชี "' + username + '"?')) return;
+      google.script.run
+        .withSuccessHandler(function () { showMsg('adminUsersMsg', 'ลบบัญชีแล้ว', 'success'); loadAccountTab(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteUser(TOKEN, username);
+    }
+
+    document.getElementById('btnAddUser').addEventListener('click', function () {
+      const role = document.getElementById('newUserRole').value;
+      const username = document.getElementById('newUserUsername').value.trim();
+      const password = document.getElementById('newUserPassword').value.trim();
+      const displayName = document.getElementById('newUserDisplayName').value.trim();
+      if (!username || !password) { showMsg('adminUsersMsg', 'กรุณากรอก username และ password', 'error'); return; }
+      const btn = document.getElementById('btnAddUser');
+      btn.disabled = true; btn.textContent = 'กำลังเพิ่ม...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'เพิ่มบัญชี';
+          showMsg('adminUsersMsg', 'เพิ่มบัญชีสำเร็จ', 'success');
+          ['newUserUsername', 'newUserPassword', 'newUserDisplayName'].forEach(function (id) { document.getElementById(id).value = ''; });
+          loadAccountTab();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'เพิ่มบัญชี';
+          if (!handleAuthError(err)) showMsg('adminUsersMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .adminAddUser(TOKEN, role, username, password, displayName);
+    });
+  </script>
+</body>
+</html>
