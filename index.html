@@ -162,13 +162,7 @@
         <div class="card">
           <h2>① เพิ่มนักเรียนใหม่</h2>
           <div id="addMsg"></div>
-          <div class="grid">
-            <div><label>ระดับชั้น *</label><select id="addGrade"></select></div>
-            <div><label>ห้อง *</label><select id="addRoom"></select></div>
-            <div><label>เบอร์โทรนักเรียน (ใช้เป็นรหัสผ่านล็อกอินของนักเรียน)</label><input id="addPhone"></div>
-            <div><label>รหัสนักเรียนจริง (ถ้ามี)</label><input id="addRealId"></div>
-          </div>
-          <div class="hint">ถ้าไม่กรอกรหัสนักเรียนจริง ระบบจะสร้าง "รหัสชั่วคราว" ให้อัตโนมัติ และใช้เป็นชื่อไฟล์รูป/ชื่อผู้ใช้ล็อกอินของนักเรียนไปก่อน<br>ต้องการเก็บชื่อ-นามสกุล หรือข้อมูลอื่นๆ เพิ่มเติม ให้ไปสร้างช่องข้อมูลที่แท็บ "จัดการฟอร์มข้อมูล" ก่อน แล้วจะมาแสดงต่อจากนี้อัตโนมัติ</div>
+          <div class="hint">ระบบจะสร้าง "รหัสชั่วคราว" ให้นักเรียนใหม่อัตโนมัติ — หลังบันทึกแล้ว ไปกำหนด<b>ระดับชั้น/ห้อง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ย้ายห้อง" และกำหนด<b>เบอร์โทร/รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล"<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
 
           <div class="divider"></div>
           <div id="addCustomFieldsWrap"><div class="hint">กำลังโหลดช่องข้อมูลเพิ่มเติม...</div></div>
@@ -464,8 +458,6 @@
     // ---------------------------------------------------------------
     // INIT dropdowns (ชั้น/ห้อง คงที่ ไม่ต้องรอ server)
     // ---------------------------------------------------------------
-    fillSelect(document.getElementById('addGrade'), gradeOptions, null);
-    fillSelect(document.getElementById('addRoom'), roomOptions, null);
     fillSelect(document.getElementById('moveNewGrade'), gradeOptions, null);
     fillSelect(document.getElementById('moveNewRoom'), roomOptions, null);
     fillSelect(document.getElementById('searchGrade'), gradeOptions, 'ทั้งหมด');
@@ -815,25 +807,19 @@
     // ===================================================================
     document.getElementById('btnAddStudent').addEventListener('click', function () {
       const info = {
-        grade: document.getElementById('addGrade').value,
-        room: document.getElementById('addRoom').value,
-        phone: document.getElementById('addPhone').value.trim(),
-        realId: document.getElementById('addRealId').value.trim(),
         customValues: collectCustomFieldValues('addCustomFieldsWrap')
       };
-      if (!info.grade || !info.room) { showMsg('addMsg', 'กรุณาเลือก ระดับชั้น และ ห้อง ให้ครบ', 'error'); return; }
       const btn = document.getElementById('btnAddStudent');
       btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
       google.script.run
         .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
-          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId, 'success');
+          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — อย่าลืมไปกำหนดชั้น/ห้อง/เบอร์โทรที่แท็บ "จัดการข้อมูล"', 'success');
           currentNewStudentId = res.id;
-          document.getElementById('newStudentLabel').textContent = info.realId || res.tempId;
+          document.getElementById('newStudentLabel').textContent = res.tempId;
           document.getElementById('newStudentPhotoCard').style.display = 'block';
           renderCustomFileFields('newCustomFileFieldsWrap', formFields, currentNewStudentId, {});
           document.getElementById('newStudentPhotoCard').scrollIntoView({ behavior: 'smooth' });
-          ['addPhone', 'addRealId'].forEach(function (id) { document.getElementById(id).value = ''; });
           renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
         })
         .withFailureHandler(function (err) {
