@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <base target="_top">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -229,6 +230,7 @@
             </div>
             <div class="divider"></div>
             <div id="editCustomFieldsWrap"></div>
+            <div id="editCustomFileFieldsWrap"></div>
             <br>
             <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
           </div>
@@ -370,56 +372,6 @@
   </div>
 
   <script>
-    // ===================================================================
-    // 🔌 เชื่อมต่อกับ Apps Script ผ่าน fetch() (เพราะไฟล์นี้ฝากไว้บน GitHub Pages
-    //    ไม่ได้รันอยู่ "ใน" Apps Script เหมือนไฟล์ Index.html ตัวต้นฉบับ)
-    //
-    //    Shim นี้สร้าง google.script.run ปลอมขึ้นมาให้ใช้ syntax เดิมได้ทุกที่
-    //    (.withSuccessHandler().withFailureHandler().ชื่อฟังก์ชัน(args))
-    //    โดยเบื้องหลังจะยิง fetch() ไปคุยกับ Apps Script Web App จริงแทน
-    //    --> โค้ดส่วนที่เหลือทั้งหมดของไฟล์นี้ไม่ต้องแก้อะไรเลย ใช้ของเดิมได้ทุกบรรทัด
-    // ===================================================================
-
-    // ⚙️ แก้ URL นี้เป็น Web App URL ของคุณ ถ้า Deploy ใหม่แล้วได้ลิงก์เปลี่ยน (ปกติไม่ควรเปลี่ยนถ้าใช้ "New version")
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
-
-    async function callApi(action, args) {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain เพื่อเลี่ยง CORS preflight
-        body: JSON.stringify({ action: action, args: args || [] })
-      });
-      const text = await res.text();
-      let json;
-      try { json = JSON.parse(text); } catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง: ' + text.slice(0, 200)); }
-      if (!json.success) throw new Error(json.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ');
-      return json.data;
-    }
-
-    function createRunProxy_(successHandler, failureHandler) {
-      return new Proxy({}, {
-        get: function (target, prop) {
-          if (prop === 'withSuccessHandler') {
-            return function (fn) { return createRunProxy_(fn, failureHandler); };
-          }
-          if (prop === 'withFailureHandler') {
-            return function (fn) { return createRunProxy_(successHandler, fn); };
-          }
-          return function () {
-            const args = Array.prototype.slice.call(arguments);
-            callApi(prop, args)
-              .then(function (result) { if (successHandler) successHandler(result); })
-              .catch(function (err) { if (failureHandler) failureHandler(err); else console.error(prop, err); });
-          };
-        }
-      });
-    }
-
-    window.google = { script: { run: createRunProxy_() } };
-    // ===================================================================
-    // ↑↑↑ จบส่วนเชื่อมต่อ API — โค้ดด้านล่างทั้งหมดเหมือนเดิมทุกบรรทัด ↓↓↓
-    // ===================================================================
-
     // ===================================================================
     // ⚙️ แก้รายชื่อ "ระดับชั้น" และ "ห้อง" ที่ต้องการให้เลือกได้ที่นี่
     // ===================================================================
@@ -970,7 +922,7 @@
       document.getElementById('editStudentLabel').textContent = s.activeCode;
       document.getElementById('editPhone').value = s.phone;
       renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields);
-      renderCustomFileFields('editCustomFieldsWrap', formFields, id, s.customFields);
+      renderCustomFileFields('editCustomFileFieldsWrap', formFields, id, s.customFields);
       document.getElementById('editFormCard').style.display = 'block';
       document.getElementById('editFormCard').scrollIntoView({ behavior: 'smooth' });
     }
