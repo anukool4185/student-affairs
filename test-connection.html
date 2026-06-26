@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ทดสอบเชื่อมต่อ API</title>
+  <style>
+    body { font-family: sans-serif; max-width: 480px; margin: 60px auto; padding: 0 20px; color: #1e293b; }
+    h1 { font-size: 18px; }
+    button {
+      padding: 10px 18px; border-radius: 6px; border: none;
+      background: #2563eb; color: #fff; font-size: 14px; cursor: pointer;
+    }
+    button:disabled { background: #94a3b8; }
+    #result {
+      margin-top: 16px; padding: 12px; border-radius: 6px;
+      font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all;
+    }
+    .ok { background: #dcfce7; color: #166534; }
+    .fail { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <h1>ทดสอบการเชื่อมต่อ Apps Script API</h1>
+  <p>กดปุ่มด้านล่างเพื่อทดสอบว่าหน้าเว็บนี้ (ซึ่งจะถูกฝากไว้บน GitHub Pages) สามารถคุยกับ Apps Script Web App ของคุณผ่าน fetch() ได้จริงหรือไม่ ก่อนจะสร้างหน้าตาทั้งระบบ</p>
+
+  <!-- แก้ลิงก์นี้เป็น Web App URL ของคุณ (ลงท้ายด้วย /exec) -->
+  <p><code id="urlShow"></code></p>
+
+  <button id="btnTest">ทดสอบเชื่อมต่อ (ping)</button>
+  <button id="btnLogin">ทดสอบ login (admin/admin123)</button>
+
+  <div id="result"></div>
+
+  <script>
+    // ===================================================================
+    // ⚙️ แก้ URL นี้เป็น Web App URL ของคุณ (Deploy > Manage deployments)
+    // ===================================================================
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
+
+    document.getElementById('urlShow').textContent = API_URL;
+
+    async function callApi(action, args) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // สำคัญ: ต้องเป็น text/plain เพื่อเลี่ยง CORS preflight
+        body: JSON.stringify({ action: action, args: args || [] })
+      });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch (e) { throw new Error('ตอบกลับไม่ใช่ JSON: ' + text.slice(0, 200)); }
+      return json;
+    }
+
+    function showResult(label, ok, content) {
+      const el = document.getElementById('result');
+      el.className = ok ? 'ok' : 'fail';
+      el.textContent = label + '\n' + (typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+    }
+
+    document.getElementById('btnTest').addEventListener('click', async function () {
+      const btn = this;
+      btn.disabled = true;
+      document.getElementById('result').className = '';
+      document.getElementById('result').textContent = 'กำลังทดสอบ...';
+      try {
+        const json = await callApi('ping');
+        if (json.success) {
+          showResult('✅ เชื่อมต่อสำเร็จ! CORS ไม่บล็อก ไปต่อขั้นที่ 2 ได้เลย', true, json.data);
+        } else {
+          showResult('⚠️ เชื่อมต่อได้ แต่ Apps Script ตอบ error กลับมา', false, json.error);
+        }
+      } catch (err) {
+        showResult('❌ เชื่อมต่อไม่ได้ (อาจเป็นปัญหา CORS หรือ URL ผิด) — รายละเอียด error:', false, err.message);
+      }
+      btn.disabled = false;
+    });
+
+    document.getElementById('btnLogin').addEventListener('click', async function () {
+      const btn = this;
+      btn.disabled = true;
+      document.getElementById('result').className = '';
+      document.getElementById('result').textContent = 'กำลังทดสอบ login...';
+      try {
+        const json = await callApi('login', ['admin', 'admin123']);
+        if (json.success) {
+          showResult('✅ login ผ่าน fetch() สำเร็จ!', true, json.data);
+        } else {
+          showResult('⚠️ เชื่อมต่อได้ แต่ login ไม่ผ่าน (เช็ครหัสผ่าน)', false, json.error);
+        }
+      } catch (err) {
+        showResult('❌ เชื่อมต่อไม่ได้ (อาจเป็นปัญหา CORS หรือ URL ผิด) — รายละเอียด error:', false, err.message);
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>
