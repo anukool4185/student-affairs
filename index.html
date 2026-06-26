@@ -11,10 +11,16 @@
     * { box-sizing: border-box; }
     body { margin: 0; font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); }
 
-    #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; gap: 24px; flex-wrap: wrap; }
     .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
     .login-card h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
     .login-card p.sub { text-align: center; color: var(--text-muted); font-size: 13px; margin: 0 0 22px; }
+    .announcement-block { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; width: 100%; max-width: 320px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .announcement-block h2 { font-size: 15px; margin: 0 0 14px; }
+    .announcement-item { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .announcement-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .announcement-item img { width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
+    .announcement-item p { font-size: 13px; margin: 0; white-space: pre-wrap; }
 
     header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
     header .title h1 { margin: 0; font-size: 19px; font-weight: 600; }
@@ -88,6 +94,10 @@
 
   <!-- ============ LOGIN SCREEN ============ -->
   <div id="loginScreen">
+    <div class="announcement-block" id="announcementBlock" style="display:none;">
+      <h2>📢 ประกาศ</h2>
+      <div id="announcementList"></div>
+    </div>
     <div class="login-card">
       <h1>ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน</h1>
       <p class="sub">กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
@@ -154,6 +164,28 @@
           <h2>ช่องข้อมูลที่มีอยู่</h2>
           <button class="btn secondary small" id="btnRefreshFields">รีเฟรชรายการ</button>
           <div id="ffList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการประชาสัมพันธ์ (admin) ============ -->
+      <section class="panel" id="panel-announcements">
+        <div class="card">
+          <h2 id="annFormTitle">เพิ่มประกาศใหม่</h2>
+          <div id="annMsg"></div>
+          <label>ข้อความประกาศ *</label>
+          <textarea id="annText" placeholder="พิมพ์ข้อความประกาศที่จะแสดงในหน้า login..."></textarea>
+          <br><br>
+          <label>รูปภาพแนบ (ไม่บังคับ)</label>
+          <input type="file" id="annImage" accept="image/*">
+          <br><br>
+          <button class="btn" id="btnSaveAnnouncement">เพิ่มประกาศ</button>
+          <button class="btn secondary" id="btnCancelEditAnnouncement" style="display:none;">ยกเลิก</button>
+        </div>
+
+        <div class="card">
+          <h2>ประกาศที่มีอยู่</h2>
+          <button class="btn secondary small" id="btnRefreshAnnouncements">รีเฟรชรายการ</button>
+          <div id="announcementsAdminList" style="margin-top:14px;"></div>
         </div>
       </section>
 
@@ -443,12 +475,12 @@
     };
 
     const TAB_LABELS = {
-      formbuilder: 'จัดการฟอร์มข้อมูล', register: 'ลงทะเบียนนักเรียน', dataManage: 'จัดการข้อมูล',
+      formbuilder: 'จัดการฟอร์มข้อมูล', announcements: 'จัดการประชาสัมพันธ์', register: 'ลงทะเบียนนักเรียน', dataManage: 'จัดการข้อมูล',
       messages: 'จัดการข้อความ', myRequests: 'คำขอของฉัน', publish: 'การจัดส่งข้อมูล',
       student: 'ข้อมูลของฉัน', company: 'ดาวน์โหลดข้อมูล', account: 'บัญชีของฉัน'
     };
     const ROLE_TABS = {
-      admin: ['formbuilder', 'register', 'dataManage', 'messages', 'publish', 'account'],
+      admin: ['formbuilder', 'announcements', 'register', 'dataManage', 'messages', 'publish', 'account'],
       teacher: ['register', 'dataManage', 'myRequests', 'account'],
       student: ['student'],
       company: ['company', 'account']
@@ -466,6 +498,27 @@
     fillSelect(document.getElementById('coRoom'), roomOptions, 'ทั้งหมด');
 
     if (TOKEN && ROLE) showApp();
+    loadPublicAnnouncements();
+
+    function loadPublicAnnouncements() {
+      google.script.run
+        .withSuccessHandler(function (list) {
+          const block = document.getElementById('announcementBlock');
+          const container = document.getElementById('announcementList');
+          if (!list || !list.length) { block.style.display = 'none'; return; }
+          let html = '';
+          list.forEach(function (a) {
+            html += '<div class="announcement-item">';
+            if (a.imageUrl) html += '<img src="' + a.imageUrl + '">';
+            html += '<p>' + escapeHtml(a.text) + '</p>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+          block.style.display = 'block';
+        })
+        .withFailureHandler(function (err) { console.error('โหลดประกาศไม่สำเร็จ', err); })
+        .getAnnouncements();
+    }
 
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
@@ -589,6 +642,7 @@
       if (panel) panel.classList.add('active');
 
       if (tab === 'formbuilder') loadFormFieldsList();
+      if (tab === 'announcements') loadAnnouncementsAdminList();
       if (tab === 'dataManage') switchSubTab('searchEdit');
       if (tab === 'student') loadMyInfo();
       if (tab === 'account') loadAccountTab();
@@ -800,6 +854,120 @@
         .withSuccessHandler(function () { loadFormFieldsList(); })
         .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
         .adminDeleteFormField(TOKEN, fieldId);
+    }
+
+    // ===================================================================
+    // TAB: จัดการประชาสัมพันธ์ (admin)
+    // ===================================================================
+    let editingAnnouncementId = null;
+
+    function loadAnnouncementsAdminList() {
+      const container = document.getElementById('announcementsAdminList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderAnnouncementsAdminList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getAnnouncements();
+    }
+    document.getElementById('btnRefreshAnnouncements').addEventListener('click', loadAnnouncementsAdminList);
+
+    function renderAnnouncementsAdminList(list) {
+      const container = document.getElementById('announcementsAdminList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ยังไม่มีประกาศ</div>'; return; }
+      let html = '';
+      list.forEach(function (a, idx) {
+        const upDisabled = (idx === 0) ? 'disabled' : '';
+        const downDisabled = (idx === list.length - 1) ? 'disabled' : '';
+        html += '<div class="card" style="margin-bottom:10px;">' +
+          (a.imageUrl ? '<img class="thumb" style="width:80px;height:80px;margin-bottom:8px;" src="' + a.imageUrl + '">' : '') +
+          '<p style="white-space:pre-wrap;">' + escapeHtml(a.text) + '</p>' +
+          '<div class="row-actions" style="margin-top:8px;">' +
+          '<button class="btn small secondary" ' + upDisabled + ' onclick="moveAnnouncement(\'' + escapeJs(a.id) + '\',\'up\')" title="เลื่อนขึ้น">▲</button> ' +
+          '<button class="btn small secondary" ' + downDisabled + ' onclick="moveAnnouncement(\'' + escapeJs(a.id) + '\',\'down\')" title="เลื่อนลง">▼</button> ' +
+          '<button class="btn small" onclick="editAnnouncement(\'' + escapeJs(a.id) + '\')">แก้ไข</button> ' +
+          '<button class="btn small danger" onclick="deleteAnnouncement(\'' + escapeJs(a.id) + '\')">ลบ</button>' +
+          '</div></div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function moveAnnouncement(id, direction) {
+      google.script.run
+        .withSuccessHandler(function () { loadAnnouncementsAdminList(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminMoveAnnouncement(TOKEN, id, direction);
+    }
+
+    function editAnnouncement(id) {
+      google.script.run
+        .withSuccessHandler(function (list) {
+          const a = list.filter(function (x) { return x.id === id; })[0];
+          if (!a) return;
+          editingAnnouncementId = id;
+          document.getElementById('annFormTitle').textContent = 'แก้ไขประกาศ';
+          document.getElementById('annText').value = a.text;
+          document.getElementById('btnSaveAnnouncement').textContent = 'บันทึกการแก้ไข';
+          document.getElementById('btnCancelEditAnnouncement').style.display = 'inline-block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .getAnnouncements();
+    }
+
+    document.getElementById('btnCancelEditAnnouncement').addEventListener('click', resetAnnouncementForm);
+    function resetAnnouncementForm() {
+      editingAnnouncementId = null;
+      document.getElementById('annFormTitle').textContent = 'เพิ่มประกาศใหม่';
+      document.getElementById('annText').value = '';
+      document.getElementById('annImage').value = '';
+      document.getElementById('btnSaveAnnouncement').textContent = 'เพิ่มประกาศ';
+      document.getElementById('btnCancelEditAnnouncement').style.display = 'none';
+    }
+
+    document.getElementById('btnSaveAnnouncement').addEventListener('click', function () {
+      const text = document.getElementById('annText').value.trim();
+      if (!text) { showMsg('annMsg', 'กรุณากรอกข้อความประกาศ', 'error'); return; }
+      const btn = document.getElementById('btnSaveAnnouncement');
+      btn.disabled = true;
+
+      function onSaved() {
+        btn.disabled = false;
+        showMsg('annMsg', editingAnnouncementId ? 'บันทึกการแก้ไขสำเร็จ' : 'เพิ่มประกาศสำเร็จ', 'success');
+        resetAnnouncementForm();
+        loadAnnouncementsAdminList();
+        loadPublicAnnouncements();
+      }
+      function onFail(err) {
+        btn.disabled = false;
+        if (!handleAuthError(err)) showMsg('annMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+      }
+
+      if (editingAnnouncementId) {
+        // แก้ไขได้แค่ข้อความ (เปลี่ยนรูปให้ลบประกาศเดิมแล้วเพิ่มใหม่)
+        google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
+          .adminUpdateAnnouncement(TOKEN, editingAnnouncementId, text);
+        return;
+      }
+
+      const fileInput = document.getElementById('annImage');
+      if (fileInput.files.length) {
+        const file = fileInput.files[0];
+        fileToBase64(file, function (base64) {
+          google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
+            .adminAddAnnouncement(TOKEN, text, base64, file.type, file.name);
+        });
+      } else {
+        google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
+          .adminAddAnnouncement(TOKEN, text, null, null, null);
+      }
+    });
+
+    function deleteAnnouncement(id) {
+      if (!confirm('ยืนยันลบประกาศนี้?')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadAnnouncementsAdminList(); loadPublicAnnouncements(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteAnnouncement(TOKEN, id);
     }
 
     // ===================================================================
