@@ -194,7 +194,12 @@
         <div class="card">
           <h2>① เพิ่มนักเรียนใหม่</h2>
           <div id="addMsg"></div>
-          <div class="hint">ระบบจะสร้าง "รหัสชั่วคราว" ให้นักเรียนใหม่อัตโนมัติ — หลังบันทึกแล้ว ไปกำหนด<b>ระดับชั้น/ห้อง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ย้ายห้อง" และกำหนด<b>เบอร์โทร/รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล"<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
+          <div class="grid">
+            <div><label>ระดับชั้น *</label><select id="addGrade"></select></div>
+            <div><label>ห้อง *</label><select id="addRoom"></select></div>
+            <div><label>รหัสชั่วคราวที่จะได้</label><input id="addTempPreview" value="กรุณาเลือกระดับชั้นและห้อง" disabled style="background:#f1f5f9;font-weight:600;"></div>
+          </div>
+          <div class="hint">รหัสชั่วคราวคำนวณจากปี พ.ศ. + ระดับชั้น + ห้อง + ลำดับในชั้น/ห้องเดียวกัน — แก้ไขเองไม่ได้ (ยกเว้นแอดมินแก้ได้ทีหลังที่แท็บ "จัดการข้อมูล")<br>กำหนด<b>เบอร์โทร/รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล" หลังบันทึกแล้ว<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
 
           <div class="divider"></div>
           <div id="addCustomFieldsWrap"><div class="hint">กำลังโหลดช่องข้อมูลเพิ่มเติม...</div></div>
@@ -252,6 +257,15 @@
             <div id="editMsg"></div>
             <div class="grid">
               <div><label>เบอร์โทร</label><input id="editPhone"></div>
+            </div>
+            <div class="grid" id="editTempIdWrap" style="display:none;margin-top:10px;">
+              <div>
+                <label>รหัสชั่วคราว (แก้ไขได้เฉพาะแอดมิน)</label>
+                <div class="inline-form">
+                  <input id="editTempId">
+                  <button class="btn small secondary" id="btnSaveTempId" type="button">บันทึกรหัสชั่วคราว</button>
+                </div>
+              </div>
             </div>
             <div class="divider"></div>
             <div id="editCustomFieldsWrap"></div>
@@ -490,12 +504,28 @@
     // ---------------------------------------------------------------
     // INIT dropdowns (ชั้น/ห้อง คงที่ ไม่ต้องรอ server)
     // ---------------------------------------------------------------
+    fillSelect(document.getElementById('addGrade'), gradeOptions, null);
+    fillSelect(document.getElementById('addRoom'), roomOptions, null);
     fillSelect(document.getElementById('moveNewGrade'), gradeOptions, null);
     fillSelect(document.getElementById('moveNewRoom'), roomOptions, null);
     fillSelect(document.getElementById('searchGrade'), gradeOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('searchRoom'), roomOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('coGrade'), gradeOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('coRoom'), roomOptions, 'ทั้งหมด');
+
+    document.getElementById('addGrade').addEventListener('change', updateTempIdPreview);
+    document.getElementById('addRoom').addEventListener('change', updateTempIdPreview);
+    function updateTempIdPreview() {
+      const grade = document.getElementById('addGrade').value;
+      const room = document.getElementById('addRoom').value;
+      const preview = document.getElementById('addTempPreview');
+      if (!grade || !room) { preview.value = 'กรุณาเลือกระดับชั้นและห้อง'; return; }
+      preview.value = 'กำลังคำนวณ...';
+      google.script.run
+        .withSuccessHandler(function (res) { preview.value = res.tempId; })
+        .withFailureHandler(function (err) { preview.value = 'คำนวณไม่ได้: ' + err.message; })
+        .previewTempId(TOKEN, grade, room);
+    }
 
     if (TOKEN && ROLE) showApp();
     loadPublicAnnouncements();
@@ -974,7 +1004,11 @@
     // TAB: ลงทะเบียนนักเรียน (admin/teacher)
     // ===================================================================
     document.getElementById('btnAddStudent').addEventListener('click', function () {
+      const grade = document.getElementById('addGrade').value;
+      const room = document.getElementById('addRoom').value;
+      if (!grade || !room) { showMsg('addMsg', 'กรุณาเลือก ระดับชั้น และ ห้อง ให้ครบ', 'error'); return; }
       const info = {
+        grade: grade, room: room,
         customValues: collectCustomFieldValues('addCustomFieldsWrap')
       };
       const btn = document.getElementById('btnAddStudent');
@@ -982,13 +1016,16 @@
       google.script.run
         .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
-          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — อย่าลืมไปกำหนดชั้น/ห้อง/เบอร์โทรที่แท็บ "จัดการข้อมูล"', 'success');
+          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — ไปกำหนดเบอร์โทร/รหัสจริงได้ที่แท็บ "จัดการข้อมูล"', 'success');
           currentNewStudentId = res.id;
           document.getElementById('newStudentLabel').textContent = res.tempId;
           document.getElementById('newStudentPhotoCard').style.display = 'block';
           renderCustomFileFields('newCustomFileFieldsWrap', formFields, currentNewStudentId, {});
           document.getElementById('newStudentPhotoCard').scrollIntoView({ behavior: 'smooth' });
           renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
+          document.getElementById('addGrade').value = '';
+          document.getElementById('addRoom').value = '';
+          document.getElementById('addTempPreview').value = 'กรุณาเลือกระดับชั้นและห้อง';
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
@@ -1124,11 +1161,36 @@
       currentEditId = id;
       document.getElementById('editStudentLabel').textContent = s.activeCode;
       document.getElementById('editPhone').value = s.phone;
+      if (ROLE === 'admin') {
+        document.getElementById('editTempIdWrap').style.display = 'block';
+        document.getElementById('editTempId').value = s.tempId;
+      } else {
+        document.getElementById('editTempIdWrap').style.display = 'none';
+      }
       renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields);
       renderCustomFileFields('editCustomFileFieldsWrap', formFields, id, s.customFields);
       document.getElementById('editFormCard').style.display = 'block';
       document.getElementById('editFormCard').scrollIntoView({ behavior: 'smooth' });
     }
+
+    document.getElementById('btnSaveTempId').addEventListener('click', function () {
+      const newTempId = document.getElementById('editTempId').value.trim();
+      if (!newTempId) { showMsg('editMsg', 'กรุณากรอกรหัสชั่วคราว', 'error'); return; }
+      if (!currentEditId) return;
+      const btn = document.getElementById('btnSaveTempId');
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false;
+          showMsg('editMsg', 'บันทึกรหัสชั่วคราวสำเร็จ', 'success');
+          document.getElementById('btnSearch').click();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .adminSetTempId(TOKEN, currentEditId, newTempId);
+    });
 
     document.getElementById('btnSaveEdit').addEventListener('click', function () {
       if (!currentEditId) return;
