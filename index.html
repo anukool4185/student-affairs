@@ -524,7 +524,15 @@
       <!-- ============ TAB: คำขอของฉัน (teacher) ============ -->
       <section class="panel" id="panel-myRequests">
         <div class="card">
-          <h2>คำขอที่ฉันส่งไป (ย้ายห้อง / ลบ)</h2>
+          <h2>ส่งข้อความ/คำขออื่นๆ ถึงแอดมิน</h2>
+          <div class="hint">นอกจากแจ้งลบ/แจ้งย้ายห้อง (ที่ทำได้จากแท็บจัดการข้อมูล) สามารถส่งข้อความอื่นๆ ถึงแอดมินได้ที่นี่</div>
+          <div id="teacherMsgSendBox" style="margin-top:10px;"></div>
+          <textarea id="teacherMessageText" placeholder="พิมพ์ข้อความที่ต้องการแจ้งแอดมิน..."></textarea>
+          <br><br>
+          <button class="btn" id="btnSendTeacherMessage">ส่งข้อความ</button>
+        </div>
+        <div class="card">
+          <h2>คำขอที่ฉันส่งไป (ย้ายห้อง / ลบ / ข้อความ)</h2>
           <button class="btn secondary small" id="btnRefreshMyRequests">รีเฟรชรายการ</button>
           <div id="myRequestsList" style="margin-top:14px;"></div>
         </div>
@@ -539,20 +547,21 @@
           <button class="btn secondary small" id="btnRefreshPending">รีเฟรชรายการ</button>
           <div id="pendingMsg" style="margin-top:10px;"></div>
           <div id="pendingList" style="margin-top:14px;"></div>
-          <div class="divider"></div>
-          <div class="grid">
-            <div><label>วันที่ส่งข้อมูล</label><input type="date" id="publishDate"></div>
-          </div>
-          <br>
-          <button class="btn success" id="btnPublishSelected">เผยแพร่รายการที่เลือก</button>
         </div>
 
         <div class="card">
           <h2>รายการข้อมูลที่มีการอัปเดต (ไม่รวมรูป)</h2>
-          <div class="hint">นักเรียนที่ครูหรือนักเรียนเองแก้ไขข้อมูลล่าสุด — ดูเพื่อตรวจสอบ ไม่ต้องกดอะไรเพิ่ม (ใช้กระดิ่ง 🔔 ที่หัวหน้าเพื่อรับทราบ)</div>
+          <div class="hint">ข้อมูลที่มีการบันทึกรหัสจริง รหัสชั่วคราว หรือข้อมูลทั่วไปอื่นๆ (ไม่ใช่การเปลี่ยนรูป) — เลือกรายการที่ต้องการส่งให้บริษัทพร้อมกับรูป (ถ้ามี) ได้ที่นี่</div>
           <br>
           <button class="btn secondary small" id="btnRefreshDataUpdates">รีเฟรชรายการ</button>
           <div id="dataUpdatesList" style="margin-top:14px;"></div>
+          <div class="divider"></div>
+          <div class="grid">
+            <div><label>วันที่ส่งข้อมูล</label><input type="date" id="publishDate"></div>
+          </div>
+          <div class="hint">ใช้ปุ่มด้านล่างนี้สำหรับรายการที่เลือกไว้จากทั้ง 2 รายการด้านบน (รูป และ/หรือ ข้อมูลอื่นๆ) พร้อมกันได้เลย</div>
+          <br>
+          <button class="btn success" id="btnPublishSelected">เผยแพร่/ส่งรายการที่เลือก</button>
         </div>
 
         <div class="card" id="publishReportCard" style="display:none;">
@@ -587,6 +596,26 @@
 
       <!-- ============ TAB: ดาวน์โหลดข้อมูล (company) ============ -->
       <section class="panel" id="panel-company">
+        <div class="card">
+          <a href="https://drive.google.com/drive/folders/1Zl7ZwXW41jd3IQq20KVwcvKFcO4Y6Rky?usp=drive_link" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;padding:9px 16px;border-radius:6px;background:var(--primary);color:#fff;font-family:'Sarabun',sans-serif;font-size:14px;font-weight:500;">📁 เปิดโฟลเดอร์รูปทั้งหมดบน Google Drive</a>
+        </div>
+
+        <div class="card" id="coNotifyCard">
+          <h2>🔔 รายการอัปเดตที่แอดมินส่งมาใหม่</h2>
+          <div class="hint">เมื่อดาวน์โหลดวันที่ใดไปแล้ว รายการนั้นจะหายไปจากหน้านี้ทันที (ดาวน์โหลดได้ใหม่อีกได้ที่แท็บค้นหาด้านล่างตามปกติ)</div>
+          <br>
+          <div style="display:flex; gap:18px; flex-wrap:wrap;">
+            <div style="flex:1 1 280px; min-width:240px;">
+              <h3 style="margin:0 0 8px;">📷 อัปเดตรูป / เปลี่ยนรหัสชั่วคราว-รหัสจริง</h3>
+              <div id="coNotifyPhotos" class="hint">กำลังโหลด...</div>
+            </div>
+            <div style="flex:1 1 280px; min-width:240px;">
+              <h3 style="margin:0 0 8px;">📄 อัปเดตข้อมูลอื่นๆ</h3>
+              <div id="coNotifyData" class="hint">กำลังโหลด...</div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <h2>ค้นหาข้อมูลและรูปภาพนักเรียน</h2>
           <div class="grid">
@@ -651,6 +680,13 @@
           <br>
           <button class="btn" id="btnBulkCreateTeachers">สร้างบัญชี</button>
           <div id="bulkResultList" style="margin-top:14px;"></div>
+
+          <div class="divider"></div>
+          <h2>เครื่องมือซ่อมข้อมูล</h2>
+          <div class="hint">ใช้ถ้าเบอร์โทรนักเรียนที่ขึ้นต้นด้วย 0 หายไปจาก Google Sheet (เช่น "0812345678" กลายเป็น "812345678") — เครื่องมือนี้จะเติม 0 กลับให้และตั้งคอลัมน์เป็นข้อความกันไม่ให้เกิดซ้ำ</div>
+          <br>
+          <button class="btn secondary" id="btnRepairPhones">🔧 ซ่อมเบอร์โทรเลข 0 หาย</button>
+          <div id="repairPhonesMsg" style="margin-top:10px;"></div>
         </div>
       </section>
 
@@ -864,14 +900,20 @@
       return (f && customFields[f.id]) ? customFields[f.id] : '';
     }
     /** สรุปค่าฟิลด์เพิ่มเติมทั้งหมด (ไม่รวมไฟล์/รูป) เป็นข้อความเดียว เช่น "ชื่อ: สมชาย | เบอร์โทร: 0812345678" */
-    function formatCustomFieldsSummary(customFields) {
-      if (!customFields || !formFields.length) return '-';
+    function formatCustomFieldsSummary(customFields, phone) {
+      if (!customFields || !formFields.length) return phone ? ('<b>เบอร์โทร:</b> ' + escapeHtml(phone)) : '-';
       const parts = [];
+      let phoneInserted = false;
       formFields.forEach(function (f) {
         if (fieldIsFile(f)) return;
         const val = customFields[f.id];
         if (val) parts.push('<b>' + escapeHtml(f.label) + ':</b> ' + escapeHtml(val));
+        if (phone && !phoneInserted && f.label.indexOf('นามสกุล') !== -1) {
+          parts.push('<b>เบอร์โทร:</b> ' + escapeHtml(phone));
+          phoneInserted = true;
+        }
       });
+      if (phone && !phoneInserted) parts.push('<b>เบอร์โทร:</b> ' + escapeHtml(phone));
       return parts.length ? parts.join(' &nbsp;|&nbsp; ') : '-';
     }
     function escapeHtml(str) {
@@ -1019,6 +1061,7 @@
       if (tab === 'publish') { loadPendingList(); loadDataUpdatesList(); }
       if (tab === 'messages') { loadRequestsList(); loadHandledList(); }
       if (tab === 'myRequests') loadMyRequestsList();
+      if (tab === 'company') loadCompanyNotifications();
     }
 
     document.querySelectorAll('#dataManageSubnav button').forEach(function (b) {
@@ -1437,9 +1480,9 @@
       if (!s) return;
       const pane = document.getElementById('photoDetailPane');
       pane.innerHTML =
-        '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields) + '</p>' +
+        '<p style="margin:0 0 10px;"><b>ชั้น/ห้อง:</b> ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</p>' +
+        '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields, s.phone) + '</p>' +
         '<button class="btn small secondary" id="btnEditFromPhoto">📝 แก้ไขข้อมูล</button>' +
-        '<p style="margin:10px 0 0;"><b>ชั้น/ห้อง:</b> ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</p>' +
         '<div class="divider"></div>' +
         (s.photoUrl ? '<img class="photo-preview" id="photoDetailPreview" src="' + s.photoUrl + '">' : '<div class="photo-preview" id="photoDetailPreview"></div>') +
         '<p class="hint">ชื่อไฟล์ที่ใช้อยู่ตอนนี้: ' + escapeHtml(s.photoFile || '(ยังไม่มีรูป)') + '</p>' +
@@ -2066,14 +2109,18 @@
       google.script.run
         .withSuccessHandler(function (list) {
           if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีข้อมูลที่อัปเดตใหม่</div>'; return; }
-          let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
+          let html = '<table><tr><th><input type="checkbox" id="dataUpdatesSelectAll"></th><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
           list.forEach(function (s) {
-            html += '<tr><td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+            html += '<tr><td><input type="checkbox" class="dataUpdateChk" value="' + s.id + '"></td>' +
+              '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
               '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
               '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td></tr>';
           });
-          html += '</table></div>';
+          html += '</table>';
           container.innerHTML = html;
+          document.getElementById('dataUpdatesSelectAll').addEventListener('change', function (e) {
+            document.querySelectorAll('.dataUpdateChk').forEach(function (c) { c.checked = e.target.checked; });
+          });
         })
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .getRecentlyModifiedStudents(TOKEN);
@@ -2118,24 +2165,26 @@
     let lastPublishReport = null;
 
     document.getElementById('btnPublishSelected').addEventListener('click', function () {
-      const ids = Array.prototype.map.call(document.querySelectorAll('.pendingChk:checked'), function (c) { return c.value; });
-      if (!ids.length) { showMsg('pendingMsg', 'กรุณาเลือกรายการที่ต้องการเผยแพร่อย่างน้อย 1 รายการ', 'error'); return; }
+      const photoIds = Array.prototype.map.call(document.querySelectorAll('.pendingChk:checked'), function (c) { return c.value; });
+      const dataIds = Array.prototype.map.call(document.querySelectorAll('.dataUpdateChk:checked'), function (c) { return c.value; });
+      if (!photoIds.length && !dataIds.length) { showMsg('pendingMsg', 'กรุณาเลือกรายการที่ต้องการเผยแพร่/ส่งข้อมูลอย่างน้อย 1 รายการ', 'error'); return; }
       const date = document.getElementById('publishDate').value;
       const btn = document.getElementById('btnPublishSelected');
-      btn.disabled = true; btn.textContent = 'กำลังเผยแพร่...';
+      btn.disabled = true; btn.textContent = 'กำลังส่งข้อมูล...';
       google.script.run
         .withSuccessHandler(function (res) {
-          btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
-          showMsg('pendingMsg', 'เผยแพร่สำเร็จ ' + res.count + ' รายการ (' + res.date + ' เวลา ' + res.hour + ':00)', 'success');
+          btn.disabled = false; btn.textContent = 'เผยแพร่/ส่งรายการที่เลือก';
+          showMsg('pendingMsg', 'ส่งข้อมูลสำเร็จ ' + res.count + ' รายการ (' + res.date + ' เวลา ' + res.hour + ':00)', 'success');
           lastPublishReport = res;
           renderPublishReport(res);
           loadPendingList();
+          loadDataUpdatesList();
         })
         .withFailureHandler(function (err) {
-          btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
+          btn.disabled = false; btn.textContent = 'เผยแพร่/ส่งรายการที่เลือก';
           if (!handleAuthError(err)) showMsg('pendingMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         })
-        .publishPhotos(TOKEN, ids, date);
+        .publishPhotos(TOKEN, photoIds, date, dataIds);
     });
 
     function renderPublishReport(res) {
@@ -2143,15 +2192,16 @@
       const container = document.getElementById('publishReportTable');
       if (!res.items.length) { card.style.display = 'none'; return; }
       let html = '<p><b>วันที่ส่งข้อมูล:</b> ' + escapeHtml(res.date) + ' &nbsp; <b>เวลา:</b> ' + escapeHtml(res.hour) + ':00 น. &nbsp; <b>จำนวน:</b> ' + res.items.length + ' รายการ</p>';
-      html += '<div class="table-scroll"><table><tr><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>ตำแหน่งโฟลเดอร์ใหม่</th><th>ชื่อไฟล์</th></tr>';
+      html += '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>ตำแหน่งโฟลเดอร์ใหม่</th><th>ชื่อไฟล์</th></tr>';
       res.items.forEach(function (it) {
         html += '<tr>' +
+          '<td>' + (it.photoUrl ? '<img class="thumb" src="' + it.photoUrl + '">' : '-') + '</td>' +
           '<td>' + escapeHtml(it.realId || '-') + '</td>' +
           '<td>' + escapeHtml(it.tempId) + '</td>' +
-          '<td style="font-size:12px;">' + formatCustomFieldsSummary(it.customFields) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(it.customFields, it.phone) + '</td>' +
           '<td>' + escapeHtml(it.grade + ' / ' + it.room) + '</td>' +
-          '<td style="font-size:12px;">' + escapeHtml(it.photoPath) + '</td>' +
-          '<td>' + escapeHtml(it.photoFile) + '</td>' +
+          '<td style="font-size:12px;">' + (it.photoPath ? escapeHtml(it.photoPath) : '<span class="hint">-</span>') + '</td>' +
+          '<td>' + (it.photoFile ? escapeHtml(it.photoFile) : '<span class="hint">-</span>') + '</td>' +
           '</tr>';
       });
       html += '</table></div>';
@@ -2166,12 +2216,12 @@
 
     document.getElementById('btnExportReportCsv').addEventListener('click', function () {
       if (!lastPublishReport || !lastPublishReport.items.length) { alert('ยังไม่มีรายงานให้ดาวน์โหลด'); return; }
-      const rows = [['รหัสจริง', 'รหัสชั่วคราว', 'ข้อมูลเพิ่มเติม', 'ระดับชั้น', 'ห้อง', 'ตำแหน่งโฟลเดอร์ใหม่', 'ชื่อไฟล์']];
+      const rows = [['รหัสจริง', 'รหัสชั่วคราว', 'เบอร์โทร', 'ข้อมูลเพิ่มเติม', 'ระดับชั้น', 'ห้อง', 'ตำแหน่งโฟลเดอร์ใหม่', 'ชื่อไฟล์']];
       lastPublishReport.items.forEach(function (it) {
         const infoText = formFields.filter(function (f) { return !fieldIsFile(f); })
           .map(function (f) { return it.customFields[f.id] ? (f.label + ': ' + it.customFields[f.id]) : ''; })
           .filter(Boolean).join(' | ');
-        rows.push([it.realId || '', it.tempId, infoText, it.grade, it.room, it.photoPath, it.photoFile]);
+        rows.push([it.realId || '', it.tempId, it.phone || '', infoText, it.grade, it.room, it.photoPath || '', it.photoFile || '']);
       });
       const csvContent = '\uFEFF' + rows.map(function (r) {
         return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
@@ -2248,11 +2298,79 @@
         .sendMessageToAdmin(TOKEN, text);
     });
 
+    document.getElementById('btnSendTeacherMessage').addEventListener('click', function () {
+      const text = document.getElementById('teacherMessageText').value.trim();
+      if (!text) { showMsg('teacherMsgSendBox', 'กรุณากรอกข้อความ', 'error'); return; }
+      const btn = document.getElementById('btnSendTeacherMessage');
+      btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'ส่งข้อความ';
+          showMsg('teacherMsgSendBox', 'ส่งข้อความถึงแอดมินแล้ว', 'success');
+          document.getElementById('teacherMessageText').value = '';
+          document.getElementById('btnRefreshMyRequests').click();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'ส่งข้อความ';
+          if (!handleAuthError(err)) showMsg('teacherMsgSendBox', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .sendMessageToAdmin(TOKEN, text);
+    });
+
     // ===================================================================
     // TAB: ดาวน์โหลดข้อมูล (company)
     // ===================================================================
     function getCoFilters() {
       return { date: document.getElementById('coDate').value, grade: document.getElementById('coGrade').value, room: document.getElementById('coRoom').value };
+    }
+
+    // ===================================================================
+    // TAB: ดาวน์โหลดข้อมูล (company) — แจ้งเตือนอัปเดตที่ยังไม่ดาวน์โหลด
+    // ===================================================================
+    function loadCompanyNotifications() {
+      const photoBox = document.getElementById('coNotifyPhotos');
+      const dataBox = document.getElementById('coNotifyData');
+      photoBox.innerHTML = 'กำลังโหลด...';
+      dataBox.innerHTML = 'กำลังโหลด...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          renderNotifyGroup(photoBox, res.photoUpdates, 'รูป');
+          renderNotifyGroup(dataBox, res.dataUpdates, 'ข้อมูล');
+        })
+        .withFailureHandler(function (err) {
+          if (!handleAuthError(err)) { photoBox.innerHTML = dataBox.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; }
+        })
+        .companyGetSendNotifications(TOKEN);
+    }
+
+    function renderNotifyGroup(box, list, type) {
+      if (!list.length) { box.innerHTML = '<div class="empty">ไม่มีรายการใหม่</div>'; return; }
+      let html = '';
+      list.forEach(function (g) {
+        html += '<div class="inline-form" style="margin-bottom:6px;">' +
+          '<span>' + escapeHtml(g.date) + ' — <b>' + g.count + '</b> รายการ</span>' +
+          '<button class="btn small secondary" onclick="downloadNotifyBatch(\'' + escapeJs(type) + '\', \'' + escapeJs(g.date) + '\', this)">ดาวน์โหลด</button>' +
+          '</div>';
+      });
+      box.innerHTML = html;
+    }
+
+    function downloadNotifyBatch(type, dateStr, btnEl) {
+      btnEl.disabled = true; btnEl.textContent = 'กำลังเตรียมไฟล์...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btnEl.disabled = false; btnEl.textContent = 'ดาวน์โหลด';
+          const link = document.createElement('a');
+          link.href = 'data:application/octet-stream;base64,' + res.base64;
+          link.download = res.filename;
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+          loadCompanyNotifications();
+        })
+        .withFailureHandler(function (err) {
+          btnEl.disabled = false; btnEl.textContent = 'ดาวน์โหลด';
+          alert('เกิดข้อผิดพลาด: ' + err.message);
+        })
+        .companyDownloadBatch(TOKEN, type, dateStr);
     }
 
     document.getElementById('btnCoSearch').addEventListener('click', function () {
@@ -2458,6 +2576,22 @@
           if (!handleAuthError(err)) showMsg('bulkTeacherMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         })
         .adminBulkCreateTeachers(TOKEN, level, gradeDigit, roomCount, password);
+    });
+
+    document.getElementById('btnRepairPhones').addEventListener('click', function () {
+      if (!confirm('ยืนยันซ่อมเบอร์โทรเลข 0 ที่หายไป? ระบบจะตรวจสอบเบอร์ที่เหลือ 9 หลักแล้วเติม 0 ข้างหน้าให้อัตโนมัติ')) return;
+      const btn = document.getElementById('btnRepairPhones');
+      btn.disabled = true; btn.textContent = 'กำลังซ่อม...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = '🔧 ซ่อมเบอร์โทรเลข 0 หาย';
+          showMsg('repairPhonesMsg', 'ซ่อมสำเร็จ ' + res.fixed + ' รายการ (ถ้า 0 รายการ แสดงว่าไม่มีปัญหาแล้ว)', 'success');
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = '🔧 ซ่อมเบอร์โทรเลข 0 หาย';
+          if (!handleAuthError(err)) showMsg('repairPhonesMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .adminRepairPhoneNumbers(TOKEN);
     });
 
     // ===================================================================
