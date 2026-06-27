@@ -1,1346 +1,1905 @@
-/**
- * ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน (v4)
- * Backend: Google Apps Script
- *
- * เมนูหลัก (แอดมิน):
- *   - จัดการฟอร์มข้อมูล : เพิ่ม/แก้/ลบ ช่องข้อมูลที่ต้องการเก็บเพิ่มเติม (ข้อความ/ตัวเลข/เบอร์โทร/ลิงก์/ดรอปดาวน์/รูปภาพ/ไฟล์)
- *   - ลงทะเบียนนักเรียน : เพิ่มนักเรียนใหม่ + กรอกข้อมูลตามฟอร์มที่ออกแบบไว้
- *   - จัดการข้อมูล      : ค้นหา/กรอง + แก้ไขข้อมูล + ยืนยันรหัสจริง + ย้ายห้อง
- *   - จัดการข้อความ      : อนุมัติ/ปฏิเสธคำขอจากครู พร้อมข้อความตอบกลับ
- *   - การจัดส่งข้อมูล    : เผยแพร่รูปจากโฟลเดอร์ชั่วคราวไปโฟลเดอร์จริง
- *
- * สิทธิ์:
- *   - แอดมิน      : ทำทุกอย่างได้ทันที + ออกแบบฟอร์ม + เผยแพร่รูป + อนุมัติคำขอ + จัดการบัญชีครู/บริษัท
- *   - ครูที่ปรึกษา : ลงทะเบียน/อัปโหลด/ยืนยันรหัส ทันที, ย้ายห้อง/ลบ ต้องส่งคำขอ, ดูสถานะคำขอของตัวเองได้
- *   - นักเรียน    : ดู+แก้ "เบอร์โทร" ของตัวเองเท่านั้น
- *   - บริษัท      : ค้นหา + ติ๊กเลือก + ดาวน์โหลด ZIP (รูป+CSV)
- */
-
-// ========================= CONFIG =========================
-// อ้างอิงตรงไปยัง Google Sheet และโฟลเดอร์ Drive ที่กำหนดไว้ (ไม่ค้นหาด้วยชื่ออีกต่อไป)
-const SHEET_ID = '1temZkD88pTT19GvBSTGvffN2e_Ixwwjg6s38UXA1E7o';
-const TEMP_FOLDER_ID = '10kf6tLK4dHkuasNCFRKZEehgtFLfTmiU';   // โฟลเดอร์เก็บภาพที่อัปโหลด (รอเผยแพร่)
-const ROOT_FOLDER_ID = '1Zl7ZwXW41jd3IQq20KVwcvKFcO4Y6Rky';   // โฟลเดอร์หลัก (แยกโฟลเดอร์ย่อยตามวันที่/ระดับชั้น/ห้อง ตอนเผยแพร่)
-
-const SHEET_NAME = 'นักเรียน';
-const USERS_SHEET_NAME = 'ผู้ใช้งานระบบ';
-const REQUESTS_SHEET_NAME = 'คำขอ';
-const FORM_FIELDS_SHEET_NAME = 'ฟอร์มข้อมูล';
-const CUSTOM_FILES_FOLDER_NAME = 'ข้อมูลเพิ่มเติม_ไฟล์แนบ'; // โฟลเดอร์ย่อยใน ROOT_FOLDER_ID
-const SESSION_TTL_SECONDS = 21600; // 6 ชั่วโมง
-
-const DEFAULT_USERS = [
-  { role: 'admin', username: 'admin', password: 'admin123', displayName: 'ผู้ดูแลระบบ' },
-  { role: 'teacher', username: 'tadmin', password: 'tadmin1', displayName: 'ครูที่ปรึกษา' },
-  { role: 'company', username: 'company', password: 'company1', displayName: 'บริษัทภายนอก' }
-];
-
-const FIELD_TYPES = ['text', 'number', 'phone', 'link', 'dropdown', 'image', 'file'];
-
-const COLUMNS = [
-  'RecordId', 'รหัสนักเรียนจริง', 'รหัสชั่วคราว',
-  'ระดับชั้น', 'ห้อง', 'เบอร์โทรนักเรียน',
-  'ชื่อไฟล์รูปปัจจุบัน', 'DriveFileId', 'สถานะรูป', 'วันที่ของรูป(ถ้ามี)',
-  'วันที่นำเข้า', 'หมายเหตุ', 'ข้อมูลฟอร์มเพิ่มเติม(JSON)'
-];
-const COL = {
-  RECORD_ID: 0, REAL_ID: 1, TEMP_ID: 2,
-  GRADE: 3, ROOM: 4, PHONE: 5,
-  PHOTO_FILE: 6, FILE_ID: 7, PHOTO_STATUS: 8, PHOTO_DATE: 9,
-  IMPORT_DATE: 10, NOTE: 11, CUSTOM_FIELDS: 12
-};
-// PHOTO_STATUS: '' (ไม่มีรูป) | 'pending' (รอเผยแพร่) | 'published' (เผยแพร่แล้ว)
-// หมายเหตุ: ฟิลด์ คำนำหน้า/ชื่อ/นามสกุล/เลขที่ ถูกย้ายออกจากฟิลด์หลัก
-// หากต้องการเก็บข้อมูลเหล่านี้ ให้แอดมินสร้างเป็น "ช่องข้อมูลเพิ่มเติม" ผ่านแท็บ "จัดการฟอร์มข้อมูล" แทน
-
-// ========================= WEB APP ENTRY =========================
-// หมายเหตุ: ไม่ใช้ไฟล์ Index.html ใน Apps Script แล้ว — หน้าตาทั้งหมดอยู่ในไฟล์ index.html
-// ที่ฝากไว้บน GitHub Pages ต่างหาก (เชื่อมต่อมาที่นี่ผ่าน fetch()/doPost เท่านั้น)
-// ไฟล์นี้ (Code.gs) ทำหน้าที่เป็น JSON API backend อย่างเดียว
-function doGet() {
-  return ContentService.createTextOutput(
-    'ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน — API พร้อมใช้งาน\n' +
-    'นี่คือ endpoint ฝั่งเซิร์ฟเวอร์ (Code.gs) เท่านั้น ไม่มีหน้าเว็บที่นี่\n' +
-    'กรุณาเข้าใช้งานผ่านเว็บไซต์ที่ฝากไว้บน GitHub Pages'
-  ).setMimeType(ContentService.MimeType.TEXT);
-}
-
-// ========================= JSON API (สำหรับเรียกจากไฟล์ index.html บน GitHub ผ่าน fetch) =========================
-// ส่ง POST แบบ Content-Type: text/plain เสมอ (เพื่อเลี่ยง CORS preflight) body เป็น JSON string:
-//   { action: 'ชื่อฟังก์ชัน', args: [อาร์กิวเมนต์ตามลำดับของฟังก์ชันนั้น] }
-// ตอบกลับเป็น JSON: { success: true, data: ... } หรือ { success: false, error: 'ข้อความ' }
-const API_FUNCTIONS = {
-  ping: function () { return { ok: true, time: new Date().toString() }; },
-  login: login,
-  logout: logout,
-  changeOwnPassword: changeOwnPassword,
-  adminListUsers: adminListUsers,
-  adminUpdateCredential: adminUpdateCredential,
-  adminAddUser: adminAddUser,
-  adminDeleteUser: adminDeleteUser,
-  getFormFields: getFormFields,
-  adminAddFormField: adminAddFormField,
-  adminUpdateFormField: adminUpdateFormField,
-  adminMoveFormField: adminMoveFormField,
-  adminDeleteFormField: adminDeleteFormField,
-  listStudents: listStudents,
-  getMyInfo: getMyInfo,
-  addStudent: addStudent,
-  updateStudentInfo: updateStudentInfo,
-  uploadPhotoForStudent: uploadPhotoForStudent,
-  uploadCustomFieldFile: uploadCustomFieldFile,
-  confirmRealId: confirmRealId,
-  listPendingPhotos: listPendingPhotos,
-  publishPhotos: publishPhotos,
-  moveStudentClass: moveStudentClass,
-  deleteStudent: deleteStudent,
-  teacherRequestMove: teacherRequestMove,
-  teacherRequestDelete: teacherRequestDelete,
-  adminListRequests: adminListRequests,
-  getMyRequests: getMyRequests,
-  adminHandleRequest: adminHandleRequest,
-  companySearchStudents: companySearchStudents,
-  companyDownloadSelected: companyDownloadSelected,
-  getAnnouncements: getAnnouncements,
-  adminAddAnnouncement: adminAddAnnouncement,
-  adminUpdateAnnouncement: adminUpdateAnnouncement,
-  adminDeleteAnnouncement: adminDeleteAnnouncement,
-  adminMoveAnnouncement: adminMoveAnnouncement,
-  previewTempId: previewTempId,
-  adminSetTempId: adminSetTempId,
-  getMyScope: getMyScope,
-  adminBulkCreateTeachers: adminBulkCreateTeachers
-};
-
-function doPost(e) {
-  return handleApiRequest_(e);
-}
-
-function handleApiRequest_(e) {
-  let action = null, args = [];
-  try {
-    if (e && e.postData && e.postData.contents) {
-      const payload = JSON.parse(e.postData.contents);
-      action = payload.action;
-      args = payload.args || [];
-    } else if (e && e.parameter && e.parameter.action) {
-      action = e.parameter.action;
-      args = e.parameter.args ? JSON.parse(e.parameter.args) : [];
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f4f6f9; --card: #ffffff;
+      --border: #e2e8f0; --text: #1e293b; --text-muted: #64748b; --success: #16a34a; --danger: #dc2626;
     }
-    if (!action) throw new Error('ไม่ได้ระบุ action');
-    if (!API_FUNCTIONS[action]) throw new Error('ไม่รู้จัก action: ' + action);
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); }
 
-    const result = API_FUNCTIONS[action].apply(null, args);
-    return jsonResponse_({ success: true, data: result });
-  } catch (err) {
-    return jsonResponse_({ success: false, error: err.message });
-  }
-}
+    #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; gap: 24px; flex-wrap: wrap; }
+    .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .login-card h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
+    .login-card p.sub { text-align: center; color: var(--text-muted); font-size: 13px; margin: 0 0 22px; }
+    .announcement-block { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; width: 100%; max-width: 320px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .announcement-block h2 { font-size: 15px; margin: 0 0 14px; }
+    .announcement-item { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .announcement-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .announcement-item img { width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
+    .announcement-item p { font-size: 13px; margin: 0; white-space: pre-wrap; }
 
-function jsonResponse_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
-}
+    header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    header .title h1 { margin: 0; font-size: 19px; font-weight: 600; }
+    header .title p { margin: 2px 0 0; font-size: 12.5px; opacity: 0.9; }
+    header .userbox { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    header .userbox button { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: 'Sarabun', sans-serif; font-size: 13px; }
+    header .userbox button:hover { background: rgba(255,255,255,0.3); }
 
-// ========================= SPREADSHEET (เปิดด้วย ID ที่กำหนดไว้ตรงๆ) =========================
-let _cachedSpreadsheet_ = null;
-function getSpreadsheet_() {
-  if (!_cachedSpreadsheet_) {
-    _cachedSpreadsheet_ = SpreadsheetApp.openById(SHEET_ID);
-  }
-  return _cachedSpreadsheet_;
-}
+    nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); overflow-x: auto; position: sticky; top: 0; z-index: 10; }
+    nav button { flex: 1; min-width: 150px; padding: 14px 10px; background: none; border: none; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+    nav button.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-// ========================= AUTH: PASSWORD HASHING =========================
-function hashPassword_(password, salt) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(password) + '::' + String(salt));
-  return bytes.map(function (b) {
-    const v = (b < 0 ? b + 256 : b).toString(16);
-    return v.length === 1 ? '0' + v : v;
-  }).join('');
-}
+    .subnav { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .subnav button { padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border); background: #fff; font-family: 'Sarabun', sans-serif; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+    .subnav button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .subpanel { display: none; }
+    .subpanel.active { display: block; }
 
-// ========================= USERS SHEET =========================
-function getUsersSheet_() {
-  const ss = getSpreadsheet_();
-  let sheet = ss.getSheetByName(USERS_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(USERS_SHEET_NAME);
-    sheet.appendRow(['บทบาท', 'Username', 'PasswordHash', 'Salt', 'ชื่อที่แสดง', 'แก้ไขล่าสุด']);
-    sheet.setFrozenRows(1);
-    DEFAULT_USERS.forEach(function (u) {
-      const salt = Utilities.getUuid();
-      const hash = hashPassword_(u.password, salt);
-      sheet.appendRow([u.role, u.username, hash, salt, u.displayName, new Date()]);
-    });
-  }
-  return sheet;
-}
+    main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
 
-// ========================= RATE LIMIT =========================
-function checkRateLimit_(username) {
-  const cache = CacheService.getScriptCache();
-  const count = parseInt(cache.get('fail_' + username) || '0', 10);
-  if (count >= 5) throw new Error('พยายามเข้าสู่ระบบผิดหลายครั้งเกินไป กรุณารอประมาณ 5 นาทีแล้วลองใหม่');
-}
-function recordFailedLogin_(username) {
-  const cache = CacheService.getScriptCache();
-  const count = parseInt(cache.get('fail_' + username) || '0', 10) + 1;
-  cache.put('fail_' + username, String(count), 300);
-}
-function clearFailedLogin_(username) {
-  CacheService.getScriptCache().remove('fail_' + username);
-}
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+    .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
 
-// ========================= SESSION =========================
-function createSession_(role, username, studentId, displayName) {
-  const token = Utilities.getUuid();
-  const session = { role: role, username: username, studentId: studentId || null, displayName: displayName || username, createdAt: Date.now() };
-  CacheService.getScriptCache().put(token, JSON.stringify(session), SESSION_TTL_SECONDS);
-  return { token: token, role: role, displayName: session.displayName, studentId: session.studentId };
-}
-function validateSession_(token) {
-  if (!token) throw new Error('กรุณาเข้าสู่ระบบ');
-  const raw = CacheService.getScriptCache().get(token);
-  if (!raw) throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
-  return JSON.parse(raw);
-}
-function requireRole_(session, roles) {
-  if (roles.indexOf(session.role) === -1) throw new Error('คุณไม่มีสิทธิ์ทำรายการนี้');
-}
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+    label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+    input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Sarabun', sans-serif; font-size: 14px; background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 70px; }
 
-// ========================= LOGIN / LOGOUT =========================
-function login(username, password) {
-  username = (username || '').toString().trim();
-  password = (password || '').toString();
-  if (!username || !password) throw new Error('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
-  checkRateLimit_(username);
+    button.btn { padding: 9px 16px; border-radius: 6px; border: none; background: var(--primary); color: #fff; font-family: 'Sarabun', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+    button.btn:hover { background: var(--primary-dark); }
+    button.btn.secondary { background: #475569; }
+    button.btn.danger { background: var(--danger); }
+    button.btn.success { background: var(--success); }
+    button.btn.small { padding: 6px 10px; font-size: 12px; }
+    button.btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    button.btn.full { width: 100%; }
 
-  const studentSheet = getSheet();
-  const last = studentSheet.getLastRow();
-  if (last >= 2) {
-    const data = studentSheet.getRange(2, 1, last - 1, COLUMNS.length).getValues();
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const code = activeCode_(row[COL.REAL_ID], row[COL.TEMP_ID]);
-      const phone = String(row[COL.PHONE] || '').trim();
-      if (code && code === username) {
-        if (phone && phone === password) {
-          clearFailedLogin_(username);
-          return createSession_('student', username, row[COL.RECORD_ID], code);
-        }
-        recordFailedLogin_(username);
-        throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    th { color: var(--text-muted); font-weight: 600; font-size: 12px; }
+    .thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #e2e8f0; display: block; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge.temp { background: #fef3c7; color: #92400e; }
+    .badge.real { background: #dcfce7; color: #166534; }
+    .badge.role { background: #e0e7ff; color: #3730a3; }
+    .badge.type { background: #f1f5f9; color: #334155; }
+    .badge.status-pending { background: #fef3c7; color: #92400e; }
+    .badge.status-published { background: #dcfce7; color: #166534; }
+    .badge.status-none { background: #f1f5f9; color: #64748b; }
+    .badge.status-approved { background: #dcfce7; color: #166534; }
+    .badge.status-rejected { background: #fee2e2; color: #991b1b; }
+    .badge.status-waiting { background: #fef3c7; color: #92400e; }
+
+    .msg { padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+    .msg.success { background: #dcfce7; color: #166534; }
+    .msg.error { background: #fee2e2; color: #991b1b; }
+    .empty { color: var(--text-muted); font-size: 13px; padding: 16px 0; text-align: center; }
+    .hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .loading { font-size: 13px; color: var(--text-muted); }
+    .inline-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .inline-form input { width: 140px; }
+    .photo-preview { width: 110px; height: 110px; border-radius: 10px; object-fit: cover; background: #e2e8f0; display: block; margin-bottom: 10px; }
+    .divider { border-top: 1px solid var(--border); margin: 18px 0; }
+    .cf-field { margin-bottom: 10px; }
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 200;
+      padding: 20px;
     }
-  }
-
-  const usersSheet = getUsersSheet_();
-  const lastU = usersSheet.getLastRow();
-  if (lastU >= 2) {
-    const udata = usersSheet.getRange(2, 1, lastU - 1, 6).getValues();
-    for (let i = 0; i < udata.length; i++) {
-      const role = udata[i][0], uname = udata[i][1], hash = udata[i][2], salt = udata[i][3], displayName = udata[i][4];
-      if (uname === username) {
-        const computed = hashPassword_(password, salt);
-        if (computed === hash) {
-          clearFailedLogin_(username);
-          return createSession_(role, username, null, displayName);
-        }
-        recordFailedLogin_(username);
-        throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 520px;
+      width: 100%;
+      max-height: 88vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
     }
-  }
-
-  recordFailedLogin_(username);
-  throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-}
-function logout(token) {
-  if (token) CacheService.getScriptCache().remove(token);
-  return { ok: true };
-}
-
-// ========================= ACCOUNT MANAGEMENT (admin/teacher/company) =========================
-function changeOwnPassword(token, oldPassword, newPassword) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher', 'company']);
-  newPassword = (newPassword || '').toString();
-  if (newPassword.length < 4) throw new Error('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร');
-  const sheet = getUsersSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][1] === session.username) {
-      const computed = hashPassword_(oldPassword, data[i][3]);
-      if (computed !== data[i][2]) throw new Error('รหัสผ่านเดิมไม่ถูกต้อง');
-      const newSalt = Utilities.getUuid();
-      const newHash = hashPassword_(newPassword, newSalt);
-      sheet.getRange(i + 2, 3, 1, 2).setValues([[newHash, newSalt]]);
-      sheet.getRange(i + 2, 6).setValue(new Date());
-      return { ok: true };
+    .modal-close {
+      position: absolute; top: 12px; right: 14px;
+      background: none; border: none; font-size: 22px; line-height: 1;
+      cursor: pointer; color: var(--text-muted);
     }
-  }
-  throw new Error('ไม่พบบัญชีผู้ใช้');
-}
-
-function adminListUsers(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getUsersSheet_();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  return sheet.getRange(2, 1, last - 1, 6).getValues().map(function (r) {
-    return { role: r[0], username: r[1], displayName: r[4] };
-  });
-}
-
-function adminUpdateCredential(token, targetUsername, newUsername, newPassword) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getUsersSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][1] === targetUsername) {
-      if (newUsername && newUsername.trim()) sheet.getRange(i + 2, 2).setValue(newUsername.trim());
-      if (newPassword && newPassword.trim()) {
-        const newSalt = Utilities.getUuid();
-        const newHash = hashPassword_(newPassword.trim(), newSalt);
-        sheet.getRange(i + 2, 3, 1, 2).setValues([[newHash, newSalt]]);
-      }
-      sheet.getRange(i + 2, 6).setValue(new Date());
-      return { ok: true };
-    }
-  }
-  throw new Error('ไม่พบบัญชีผู้ใช้');
-}
-
-function adminAddUser(token, role, username, password, displayName) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  role = (role || '').trim();
-  username = (username || '').trim();
-  password = (password || '').toString();
-  if (['admin', 'teacher', 'company'].indexOf(role) === -1) throw new Error('บทบาทไม่ถูกต้อง');
-  if (!username || !password) throw new Error('กรุณากรอก username และ password');
-  if (password.length < 4) throw new Error('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
-  const sheet = getUsersSheet_();
-  const last = sheet.getLastRow();
-  const data = last >= 2 ? sheet.getRange(2, 1, last - 1, 6).getValues() : [];
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][1] === username) throw new Error('Username นี้มีอยู่แล้ว');
-  }
-  const salt = Utilities.getUuid();
-  const hash = hashPassword_(password, salt);
-  sheet.appendRow([role, username, hash, salt, displayName || username, new Date()]);
-  return { ok: true };
-}
-
-function adminDeleteUser(token, username) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  if (username === session.username) throw new Error('ไม่สามารถลบบัญชีของตัวเองได้');
-  const sheet = getUsersSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-  let adminCount = 0;
-  data.forEach(function (r) { if (r[0] === 'admin') adminCount++; });
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][1] === username) {
-      if (data[i][0] === 'admin' && adminCount <= 1) throw new Error('ต้องมีบัญชีแอดมินเหลืออย่างน้อย 1 บัญชี');
-      sheet.deleteRow(i + 2);
-      return { ok: true };
-    }
-  }
-  throw new Error('ไม่พบบัญชีผู้ใช้');
-}
-
-/**
- * สร้างบัญชีครูที่ปรึกษาแบบกลุ่ม — username = [A|P|M]+เลขระดับชั้น+เลขห้อง เช่น M31 = ม.3 ห้อง 1
- * roomCount: จะสร้างห้อง 1 ถึง roomCount ทั้งหมด (ห้องที่ username ซ้ำกับที่มีอยู่แล้วจะข้ามไป)
- */
-function adminBulkCreateTeachers(token, levelChar, gradeDigit, roomCount, password) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-
-  levelChar = String(levelChar || '').toUpperCase();
-  if (['A', 'P', 'M'].indexOf(levelChar) === -1) throw new Error('กรุณาเลือกช่วงชั้น A, P หรือ M');
-  gradeDigit = parseInt(gradeDigit, 10);
-  roomCount = parseInt(roomCount, 10);
-  password = (password || '').toString();
-  if (!gradeDigit || gradeDigit < 1) throw new Error('กรุณาระบุระดับชั้น');
-  if (!roomCount || roomCount < 1) throw new Error('กรุณาระบุจำนวนห้องอย่างน้อย 1 ห้อง');
-  if (password.length < 4) throw new Error('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
-
-  const sheet = getUsersSheet_();
-  const last = sheet.getLastRow();
-  const existing = {};
-  if (last >= 2) {
-    sheet.getRange(2, 2, last - 1, 1).getValues().forEach(function (r) { existing[r[0]] = true; });
-  }
-
-  const scopeLabel = parseTeacherScope_(levelChar + gradeDigit + '1').grade; // ใช้แค่หา label ระดับชั้น
-  const created = [];
-  const skipped = [];
-  for (let room = 1; room <= roomCount; room++) {
-    const username = levelChar + gradeDigit + room;
-    if (existing[username]) { skipped.push(username); continue; }
-    const salt = Utilities.getUuid();
-    const hash = hashPassword_(password, salt);
-    sheet.appendRow(['teacher', username, hash, salt, 'ครูที่ปรึกษา ' + scopeLabel + ' ห้อง ' + room, new Date()]);
-    created.push({ username: username, password: password });
-  }
-  return { created: created, skipped: skipped };
-}
-
-// ========================= ฟอร์มข้อมูล (Form Builder, admin เท่านั้น / teacher อ่านได้) =========================
-function getFormFieldsSheet_() {
-  const ss = getSpreadsheet_();
-  let sheet = ss.getSheetByName(FORM_FIELDS_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(FORM_FIELDS_SHEET_NAME);
-    sheet.appendRow(['FieldId', 'ลำดับ', 'ชื่อช่อง', 'ประเภท', 'ตัวเลือก(JSON)', 'วันที่สร้าง']);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
-}
-
-/** อ่านรายการช่องข้อมูลที่แอดมินออกแบบไว้ — admin/teacher อ่านได้ (ใช้ตอนลงทะเบียน/แก้ไขข้อมูล) */
-function getFormFields(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher']);
-  const sheet = getFormFieldsSheet_();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-  const result = data.map(function (r) {
-    return { id: r[0], order: r[1], label: r[2], type: r[3], options: r[4] ? JSON.parse(r[4]) : [] };
-  });
-  result.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
-  return result;
-}
-
-/** options: array of string (ใช้เฉพาะ type==='dropdown') */
-function adminAddFormField(token, label, type, options) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  label = (label || '').toString().trim();
-  type = (type || '').toString().trim();
-  if (!label) throw new Error('กรุณาระบุชื่อช่องข้อมูล');
-  if (FIELD_TYPES.indexOf(type) === -1) throw new Error('ประเภทข้อมูลไม่ถูกต้อง');
-  if (type === 'dropdown' && (!options || !options.length)) throw new Error('กรุณาเพิ่มรายการตัวเลือกสำหรับดรอปดาวน์อย่างน้อย 1 รายการ');
-
-  const sheet = getFormFieldsSheet_();
-  const order = sheet.getLastRow(); // ใช้แถวล่าสุดเป็นลำดับถัดไป (ลำดับเริ่มที่ 1)
-  const fieldId = Utilities.getUuid();
-  sheet.appendRow([fieldId, order, label, type, type === 'dropdown' ? JSON.stringify(options) : '', new Date()]);
-  return { id: fieldId };
-}
-
-function adminUpdateFormField(token, fieldId, label, type, options) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  type = (type || '').toString().trim();
-  if (FIELD_TYPES.indexOf(type) === -1) throw new Error('ประเภทข้อมูลไม่ถูกต้อง');
-  if (type === 'dropdown' && (!options || !options.length)) throw new Error('กรุณาเพิ่มรายการตัวเลือกสำหรับดรอปดาวน์อย่างน้อย 1 รายการ');
-
-  const sheet = getFormFieldsSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === fieldId) {
-      sheet.getRange(i + 2, 3, 1, 2).setValues([[(label || data[i][2]).toString(), type]]);
-      sheet.getRange(i + 2, 5).setValue(type === 'dropdown' ? JSON.stringify(options || []) : '');
-      return { ok: true };
-    }
-  }
-  throw new Error('ไม่พบช่องข้อมูลนี้');
-}
-
-/** สลับลำดับก่อน-หลังของช่องข้อมูล: direction = 'up' | 'down' */
-function adminMoveFormField(token, fieldId, direction) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getFormFieldsSheet_();
-  const last = sheet.getLastRow();
-  if (last < 3) return { ok: true }; // มีน้อยกว่า 2 รายการ ไม่ต้องสลับ
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-
-  const indexed = data.map(function (r, i) { return { rowNum: i + 2, id: r[0], order: r[1] }; });
-  indexed.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
-
-  const pos = indexed.findIndex(function (x) { return x.id === fieldId; });
-  if (pos === -1) throw new Error('ไม่พบช่องข้อมูลนี้');
-
-  const targetPos = (direction === 'up') ? pos - 1 : pos + 1;
-  if (targetPos < 0 || targetPos >= indexed.length) return { ok: true }; // อยู่ขอบสุดแล้ว
-
-  const a = indexed[pos], b = indexed[targetPos];
-  sheet.getRange(a.rowNum, 2).setValue(b.order);
-  sheet.getRange(b.rowNum, 2).setValue(a.order);
-  return { ok: true };
-}
-
-function adminDeleteFormField(token, fieldId) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getFormFieldsSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 6).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === fieldId) { sheet.deleteRow(i + 2); return { ok: true }; }
-  }
-  throw new Error('ไม่พบช่องข้อมูลนี้');
-}
-
-// ========================= STUDENT SHEET HELPERS =========================
-function getSheet() {
-  const ss = getSpreadsheet_();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(COLUMNS);
-    sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, COLUMNS.length).setFontWeight('bold');
-  }
-  return sheet;
-}
-
-function findRowByRecordId_(id) {
-  const sheet = getSheet();
-  const last = sheet.getLastRow();
-  if (last < 2) throw new Error('ไม่พบข้อมูลนักเรียน');
-  const ids = sheet.getRange(2, COL.RECORD_ID + 1, last - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
-    if (ids[i][0] === id) return i + 2;
-  }
-  throw new Error('ไม่พบข้อมูลนักเรียน (อาจถูกลบไปแล้ว)');
-}
-
-function activeCode_(realId, tempId) {
-  realId = (realId || '').toString().trim();
-  tempId = (tempId || '').toString().trim();
-  return realId !== '' ? realId : tempId;
-}
-function sanitizeFileCode_(code) {
-  return String(code).replace(/[\\/:*?"<>|]/g, '-').trim();
-}
-
-// ========================= DRIVE HELPERS =========================
-function getRootFolder_() {
-  return DriveApp.getFolderById(ROOT_FOLDER_ID);
-}
-function getTempFolder_() {
-  return DriveApp.getFolderById(TEMP_FOLDER_ID);
-}
-function getCustomFilesFolder_() {
-  return getOrCreateSubFolder_(getRootFolder_(), CUSTOM_FILES_FOLDER_NAME);
-}
-function getOrCreateSubFolder_(parent, name) {
-  const folders = parent.getFoldersByName(name);
-  if (folders.hasNext()) return folders.next();
-  return parent.createFolder(name);
-}
-/** ระบุ dateStr -> รูปภาพนักเรียน/[dateStr]/[grade]/ห้อง [room] | ไม่ระบุ -> รูปภาพนักเรียน/[grade]/ห้อง [room] */
-function getClassFolder_(grade, room, dateStr) {
-  const root = getRootFolder_();
-  let base = root;
-  if (dateStr && String(dateStr).trim()) base = getOrCreateSubFolder_(root, String(dateStr).trim());
-  const gradeFolder = getOrCreateSubFolder_(base, grade);
-  return getOrCreateSubFolder_(gradeFolder, 'ห้อง ' + room);
-}
-
-/**
- * รหัสชั่วคราว = [2 หลักท้ายปี พ.ศ.][2 หลักรหัสช่วงชั้น+ระดับชั้น][2 หลักห้อง][3 หลักลำดับในชั้น+ห้องเดียวกัน]
- * รหัสช่วงชั้น: อนุบาล=1, ป.=2, ม.=3 ต่อด้วยระดับชั้นในช่วงนั้น (กันชนกันข้ามช่วงชั้น)
- * เช่น ม.6 ห้อง 2 ลำดับที่ 23 ปี พ.ศ. 2569 -> 69 36 02 023 -> "693602023"
- */
-const GRADE_CODE_MAP = {
-  'อนุบาล 1': '11', 'อนุบาล 2': '12', 'อนุบาล 3': '13',
-  'ป.1': '21', 'ป.2': '22', 'ป.3': '23', 'ป.4': '24', 'ป.5': '25', 'ป.6': '26',
-  'ม.1': '31', 'ม.2': '32', 'ม.3': '33', 'ม.4': '34', 'ม.5': '35', 'ม.6': '36'
-};
-
-function buddhistYear2Digits_() {
-  const y = new Date().getFullYear() + 543;
-  return String(y % 100).padStart(2, '0');
-}
-
-/** คำนวณรหัสชั่วคราวถัดไปสำหรับ ระดับชั้น+ห้อง ที่ระบุ (ลำดับไม่ซ้ำแม้มีคนออกจากห้องไปแล้ว) */
-function computeTempCode_(grade, room) {
-  const gradeCode = GRADE_CODE_MAP[grade];
-  if (!gradeCode) throw new Error('ระดับชั้นไม่ถูกต้องหรือยังไม่รองรับ: ' + grade);
-  if (!room) throw new Error('กรุณาระบุห้อง');
-  const roomCode = String(room).padStart(2, '0').slice(-2);
-  const yearCode = buddhistYear2Digits_();
-  const prefix = yearCode + gradeCode + roomCode;
-
-  const sheet = getSheet();
-  const last = sheet.getLastRow();
-  let maxSeq = 0;
-  if (last >= 2) {
-    const data = sheet.getRange(2, COL.TEMP_ID + 1, last - 1, 1).getValues();
-    data.forEach(function (r) {
-      const tempId = String(r[0] || '');
-      if (tempId.length === prefix.length + 3 && tempId.indexOf(prefix) === 0) {
-        const n = parseInt(tempId.substring(prefix.length), 10);
-        if (!isNaN(n) && n > maxSeq) maxSeq = n;
-      }
-    });
-  }
-  const seqCode = String(maxSeq + 1).padStart(3, '0');
-  return prefix + seqCode;
-}
-
-/** ดูตัวอย่างรหัสชั่วคราวที่จะได้ ก่อนกดบันทึกจริง (ใช้ตอนเลือกระดับชั้น/ห้องในฟอร์มลงทะเบียน) */
-function previewTempId(token, grade, room) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher']);
-  return { tempId: computeTempCode_(grade, room) };
-}
-
-/** แอดมินแก้รหัสชั่วคราวด้วยมือได้ (ครูแก้ไม่ได้) — เปลี่ยนชื่อไฟล์รูปเดิมให้ตรงกันด้วยถ้ามี */
-function adminSetTempId(token, id, newTempId) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  newTempId = (newTempId || '').toString().trim();
-  if (!newTempId) throw new Error('กรุณาระบุรหัสชั่วคราวใหม่');
-
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const realId = rowVals[COL.REAL_ID];
-  const fileId = rowVals[COL.FILE_ID];
-
-  sheet.getRange(row, COL.TEMP_ID + 1).setValue(newTempId);
-
-  // ถ้ายังไม่มีรหัสจริง (ไฟล์ใช้รหัสชั่วคราวเป็นชื่ออยู่) ต้องเปลี่ยนชื่อไฟล์ตามด้วย
-  if (fileId && !realId) {
-    try {
-      const file = DriveApp.getFileById(fileId);
-      const extMatch = file.getName().match(/\.[^.]+$/);
-      const ext = extMatch ? extMatch[0] : '.jpg';
-      const newName = sanitizeFileCode_(newTempId) + ext;
-      file.setName(newName);
-      sheet.getRange(row, COL.PHOTO_FILE + 1).setValue(newName);
-    } catch (e) { /* ไฟล์อาจถูกลบไปแล้ว */ }
-  }
-  return { ok: true };
-}
-
-function rowToObject_(row) {
-  let customFields = {};
-  try { customFields = row[COL.CUSTOM_FIELDS] ? JSON.parse(row[COL.CUSTOM_FIELDS]) : {}; } catch (e) { customFields = {}; }
-  return {
-    id: row[COL.RECORD_ID],
-    realId: row[COL.REAL_ID] || '',
-    tempId: row[COL.TEMP_ID] || '',
-    grade: row[COL.GRADE] || '',
-    room: row[COL.ROOM] || '',
-    phone: row[COL.PHONE] || '',
-    photoFile: row[COL.PHOTO_FILE] || '',
-    fileId: row[COL.FILE_ID] || '',
-    photoStatus: row[COL.PHOTO_STATUS] || '',
-    photoDate: row[COL.PHOTO_DATE] || '',
-    importDate: row[COL.IMPORT_DATE] ? new Date(row[COL.IMPORT_DATE]).toLocaleDateString('th-TH') : '',
-    note: row[COL.NOTE] || '',
-    customFields: customFields,
-    activeCode: activeCode_(row[COL.REAL_ID], row[COL.TEMP_ID]),
-    photoUrl: row[COL.FILE_ID] ? ('https://drive.google.com/thumbnail?id=' + row[COL.FILE_ID] + '&sz=w200') : ''
-  };
-}
-
-// ========================= STUDENT CRUD =========================
-/**
- * username ของครูที่ปรึกษามีรูปแบบ [A|P|M][เลขระดับชั้น][เลขห้อง] เช่น M31 = ม.3 ห้อง 1
- * A=อนุบาล, P=ป., M=ม. — ใช้จำกัดขอบเขตการมองเห็น/จัดการของครูให้เห็นแค่ห้องตัวเอง
- */
-function parseTeacherScope_(username) {
-  const m = String(username || '').match(/^([APM])(\d)(\d+)$/);
-  if (!m) return null;
-  const levelChar = m[1], gradeDigit = m[2], room = m[3];
-  let grade;
-  if (levelChar === 'A') grade = 'อนุบาล ' + gradeDigit;
-  else if (levelChar === 'P') grade = 'ป.' + gradeDigit;
-  else grade = 'ม.' + gradeDigit;
-  return { grade: grade, room: room, label: grade + ' / ห้อง ' + room };
-}
-
-/** ครูเรียกเพื่อรู้ขอบเขตห้องของตัวเอง (ใช้ตั้งค่าฟอร์มฝั่ง client) */
-function getMyScope(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['teacher']);
-  const scope = parseTeacherScope_(session.username);
-  if (!scope) throw new Error('Username ของครูไม่ได้อยู่ในรูปแบบที่ระบบกำหนด (เช่น M31) กรุณาติดต่อแอดมิน');
-  return scope;
-}
-
-function listStudents(token, filter) {
-  const session = validateSession_(token);
-  const sheet = getSheet();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, COLUMNS.length).getValues();
-
-  if (session.role === 'student') {
-    const row = data.filter(function (r) { return r[COL.RECORD_ID] === session.studentId; })[0];
-    return row ? [rowToObject_(row)] : [];
-  }
-
-  requireRole_(session, ['admin', 'teacher']);
-  filter = filter || {};
-  if (session.role === 'teacher') {
-    const scope = parseTeacherScope_(session.username);
-    if (scope) { filter.grade = scope.grade; filter.room = scope.room; }
-  }
-  const result = [];
-  data.forEach(function (row) {
-    if (filter.grade && row[COL.GRADE] !== filter.grade) return;
-    if (filter.room && String(row[COL.ROOM]) !== String(filter.room)) return;
-    if (filter.onlyTemp && row[COL.REAL_ID]) return;
-    if (filter.onlyNoPhoto && row[COL.PHOTO_STATUS]) return;
-    if (filter.query) {
-      const q = filter.query.toString().toLowerCase();
-      const hay = [row[COL.REAL_ID], row[COL.TEMP_ID]].join(' ').toLowerCase();
-      if (hay.indexOf(q) === -1) return;
-    }
-    result.push(rowToObject_(row));
-  });
-  return result;
-}
-
-function getMyInfo(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['student']);
-  const row = findRowByRecordId_(session.studentId);
-  const sheet = getSheet();
-  return rowToObject_(sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0]);
-}
-
-/**
- * info: { grade, room, phone, realId, note, customValues }
- * customValues: { [fieldId]: value } — ใช้กับช่องประเภท text/number/phone/link/dropdown เท่านั้น
- * (ช่องประเภท image/file ใช้ uploadCustomFieldFile แยกหลังจากสร้างนักเรียนแล้ว)
- */
-/**
- * info: { grade, room, phone, realId, note, customValues } — ทุกฟิลด์ไม่บังคับแล้ว
- * (ฟอร์มลงทะเบียนตัดช่อง ระดับชั้น/ห้อง/เบอร์โทร/รหัสจริง ออกไปแล้ว ใช้ "จัดการข้อมูล" กำหนดทีหลังแทน)
- * คำเตือน: ถ้าไม่กำหนดระดับชั้น/ห้อง รูปจะเผยแพร่ไม่ได้ และถ้าไม่กำหนดเบอร์โทร นักเรียนจะ login ไม่ได้
- * จนกว่าแอดมิน/ครูจะไปกรอกให้ทีหลังในแท็บ "จัดการข้อมูล"
- */
-/**
- * info: { grade, room, phone, realId, note, customValues }
- * grade/room บังคับกรอกแล้ว (ใช้คำนวณรหัสชั่วคราว) — phone/realId ยังไม่บังคับ ไปกำหนดทีหลังได้
- */
-function addStudent(token, info) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher']);
-  info = info || {};
-
-  if (session.role === 'teacher') {
-    const scope = parseTeacherScope_(session.username);
-    if (!scope) throw new Error('Username ของครูไม่ได้อยู่ในรูปแบบที่ระบบกำหนด (เช่น M31) กรุณาติดต่อแอดมิน');
-    info.grade = scope.grade;
-    info.room = scope.room;
-  }
-  if (!info.grade || !info.room) throw new Error('กรุณาระบุ ระดับชั้น และ ห้อง (ใช้คำนวณรหัสชั่วคราว)');
-
-  const sheet = getSheet();
-  const tempId = computeTempCode_(info.grade, info.room);
-  const recordId = Utilities.getUuid();
-  const customValues = info.customValues || {};
-  sheet.appendRow([
-    recordId, (info.realId || '').trim(), tempId,
-    info.grade || '', info.room || '', info.phone || '',
-    '', '', '', '', new Date(), info.note || '', JSON.stringify(customValues)
-  ]);
-  return { id: recordId, tempId: tempId };
-}
-
-/**
- * info: { phone, note, customValues }
- * student: แก้ได้แค่ของตัวเอง และแค่ phone/note (ไม่รวม customValues)
- * admin/teacher: แก้ได้ทุกฟิลด์ของใครก็ได้ รวม customValues (จะ "merge" เข้ากับของเดิม ไม่ทับข้อมูลไฟล์ที่อัปโหลดไว้)
- */
-function updateStudentInfo(token, id, info) {
-  const session = validateSession_(token);
-  info = info || {};
-  const sheet = getSheet();
-  const row = findRowByRecordId_(id);
-
-  if (session.role === 'student') {
-    if (session.studentId !== id) throw new Error('ไม่มีสิทธิ์แก้ไขข้อมูลของผู้อื่น');
-    if (typeof info.phone !== 'undefined') sheet.getRange(row, COL.PHONE + 1).setValue(info.phone);
-    if (typeof info.note !== 'undefined') sheet.getRange(row, COL.NOTE + 1).setValue(info.note);
-    return { ok: true };
-  }
-
-  requireRole_(session, ['admin', 'teacher']);
-  if (typeof info.phone !== 'undefined') sheet.getRange(row, COL.PHONE + 1).setValue(info.phone || '');
-  if (typeof info.note !== 'undefined') sheet.getRange(row, COL.NOTE + 1).setValue(info.note || '');
-
-  if (typeof info.customValues !== 'undefined') {
-    const existingRaw = sheet.getRange(row, COL.CUSTOM_FIELDS + 1).getValue();
-    let existingObj = {};
-    try { existingObj = existingRaw ? JSON.parse(existingRaw) : {}; } catch (e) { existingObj = {}; }
-    const merged = Object.assign({}, existingObj, info.customValues);
-    sheet.getRange(row, COL.CUSTOM_FIELDS + 1).setValue(JSON.stringify(merged));
-  }
-  return { ok: true };
-}
-
-/** อัปโหลดรูป -> เก็บในโฟลเดอร์ชั่วคราวเสมอ (สถานะ pending) รอแอดมินเผยแพร่ — admin/teacher เท่านั้น */
-function uploadPhotoForStudent(token, id, base64Data, mimeType, originalName) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher']);
-
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const oldFileId = rowVals[COL.FILE_ID];
-
-  const code = sanitizeFileCode_(activeCode_(rowVals[COL.REAL_ID], rowVals[COL.TEMP_ID]));
-  const folder = getTempFolder_();
-
-  if (oldFileId) { try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) { /* ignore */ } }
-
-  const extMatch = String(originalName || '').match(/\.[^.]+$/);
-  const ext = extMatch ? extMatch[0] : '.jpg';
-  const newFileName = code + ext;
-  const bytes = Utilities.base64Decode(base64Data);
-  const blob = Utilities.newBlob(bytes, mimeType, newFileName);
-  const file = folder.createFile(blob);
-  file.setName(newFileName);
-
-  sheet.getRange(row, COL.PHOTO_FILE + 1, 1, 4).setValues([[newFileName, file.getId(), 'pending', '']]);
-
-  return {
-    fileName: newFileName, fileId: file.getId(), status: 'pending',
-    photoUrl: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w200'
-  };
-}
-
-/**
- * อัปโหลดไฟล์/รูปสำหรับ "ช่องข้อมูลเพิ่มเติม" ที่แอดมินออกแบบเอง (ประเภท image/file)
- * เก็บไฟล์จริงใน Drive โฟลเดอร์ "ข้อมูลเพิ่มเติม_ไฟล์แนบ/[ชื่อช่อง]/" — admin/teacher เท่านั้น
- */
-function uploadCustomFieldFile(token, id, fieldId, base64Data, mimeType, originalName) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher']);
-
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const code = sanitizeFileCode_(activeCode_(rowVals[COL.REAL_ID], rowVals[COL.TEMP_ID]));
-
-  let fieldLabel = fieldId;
-  const fieldsSheet = getFormFieldsSheet_();
-  const fLast = fieldsSheet.getLastRow();
-  if (fLast >= 2) {
-    const fdata = fieldsSheet.getRange(2, 1, fLast - 1, 6).getValues();
-    for (let i = 0; i < fdata.length; i++) { if (fdata[i][0] === fieldId) { fieldLabel = fdata[i][2]; break; } }
-  }
-
-  const subFolder = getOrCreateSubFolder_(getCustomFilesFolder_(), fieldLabel);
-
-  let existingObj = {};
-  try { existingObj = rowVals[COL.CUSTOM_FIELDS] ? JSON.parse(rowVals[COL.CUSTOM_FIELDS]) : {}; } catch (e) { existingObj = {}; }
-  if (existingObj[fieldId] && existingObj[fieldId].fileId) {
-    try { DriveApp.getFileById(existingObj[fieldId].fileId).setTrashed(true); } catch (e) { /* ignore */ }
-  }
-
-  const extMatch = String(originalName || '').match(/\.[^.]+$/);
-  const ext = extMatch ? extMatch[0] : '';
-  const newFileName = code + '_' + sanitizeFileCode_(fieldLabel) + ext;
-  const bytes = Utilities.base64Decode(base64Data);
-  const blob = Utilities.newBlob(bytes, mimeType, newFileName);
-  const file = subFolder.createFile(blob);
-  file.setName(newFileName);
-
-  const url = 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w200';
-  existingObj[fieldId] = { fileId: file.getId(), fileName: newFileName, url: url };
-  sheet.getRange(row, COL.CUSTOM_FIELDS + 1).setValue(JSON.stringify(existingObj));
-
-  return { fileId: file.getId(), fileName: newFileName, url: url };
-}
-
-/** ยืนยันรหัสจริง -> เปลี่ยนชื่อไฟล์เดิม (ตำแหน่งเดิม ไม่ว่าจะอยู่โฟลเดอร์ชั่วคราวหรือเผยแพร่แล้ว) */
-/**
- * ยืนยัน/แก้ไข/ลบ รหัสนักเรียนจริง — เปลี่ยนชื่อไฟล์รูปเดิม (ตำแหน่งเดิม) ให้ตรงกับรหัสที่ใช้งานล่าสุดเสมอ
- * realId = '' (ค่าว่าง) คือการ "ลบรหัสจริง" -> รูปจะกลับไปใช้ชื่อตามรหัสชั่วคราวแทน
- */
-function confirmRealId(token, id, realId) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin', 'teacher']);
-  realId = (realId || '').toString().trim();
-
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const fileId = rowVals[COL.FILE_ID];
-  const tempId = rowVals[COL.TEMP_ID];
-
-  sheet.getRange(row, COL.REAL_ID + 1).setValue(realId);
-
-  const activeNow = realId || tempId; // ถ้าลบรหัสจริง ให้กลับไปใช้รหัสชั่วคราวแทน
-  if (fileId) {
-    try {
-      const file = DriveApp.getFileById(fileId);
-      const extMatch = file.getName().match(/\.[^.]+$/);
-      const ext = extMatch ? extMatch[0] : '.jpg';
-      const newName = sanitizeFileCode_(activeNow) + ext;
-      file.setName(newName);
-      sheet.getRange(row, COL.PHOTO_FILE + 1).setValue(newName);
-    } catch (e) { /* ไฟล์อาจถูกลบไปแล้ว */ }
-  }
-  return { ok: true };
-}
-
-// ========================= PUBLISH (admin only) =========================
-function listPendingPhotos(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getSheet();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, COLUMNS.length).getValues();
-  const result = [];
-  data.forEach(function (row) {
-    if (row[COL.PHOTO_STATUS] === 'pending') result.push(rowToObject_(row));
-  });
-  return result;
-}
-
-/** เผยแพร่รายการที่เลือก: ย้ายไฟล์จากโฟลเดอร์ชั่วคราว ไปโฟลเดอร์ [วันที่ถ้ามี]/ระดับชั้น/ห้อง */
-function publishPhotos(token, ids, date) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  if (!ids || !ids.length) throw new Error('กรุณาเลือกรายการที่ต้องการเผยแพร่อย่างน้อย 1 รายการ');
-  const dateStr = (date || '').toString().trim();
-  const sheet = getSheet();
-  let count = 0;
-
-  ids.forEach(function (id) {
-    try {
-      const row = findRowByRecordId_(id);
-      const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-      const fileId = rowVals[COL.FILE_ID];
-      const grade = rowVals[COL.GRADE], room = rowVals[COL.ROOM];
-      if (!fileId || !grade || !room) return;
-
-      const file = DriveApp.getFileById(fileId);
-      const folder = getClassFolder_(grade, room, dateStr);
-      const parentIds = [];
-      const parents = file.getParents();
-      while (parents.hasNext()) parentIds.push(parents.next().getId());
-      folder.addFile(file);
-      parentIds.forEach(function (pid) {
-        if (pid !== folder.getId()) { try { DriveApp.getFolderById(pid).removeFile(file); } catch (e) { /* ignore */ } }
+    .modal-close:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="loginScreen">
+    <div class="announcement-block" id="announcementBlock" style="display:none;">
+      <h2>📢 ประกาศ</h2>
+      <div id="announcementList"></div>
+    </div>
+    <div class="login-card">
+      <h1>ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน</h1>
+      <p class="sub">กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
+      <div id="loginMsg"></div>
+      <label>ชื่อผู้ใช้</label>
+      <input id="loginUsername" placeholder="username" autocomplete="username">
+      <br><br>
+      <label>รหัสผ่าน</label>
+      <input id="loginPassword" type="password" placeholder="password" autocomplete="current-password">
+      <br><br>
+      <button class="btn full" id="btnLogin">เข้าสู่ระบบ</button>
+      <p class="hint" style="text-align:center;margin-top:14px;">
+        นักเรียน: ใช้รหัสนักเรียน (จริง/ชั่วคราว) เป็นชื่อผู้ใช้ และเบอร์โทรเป็นรหัสผ่าน
+      </p>
+    </div>
+  </div>
+
+  <!-- ============ MAIN APP ============ -->
+  <div id="appScreen" style="display:none;">
+    <header>
+      <div class="title">
+        <h1>ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน</h1>
+        <p>Google Sheets + Google Drive</p>
+      </div>
+      <div class="userbox">
+        <span id="userLabel"></span>
+        <button id="btnLogout">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <nav id="tabNav"></nav>
+
+    <main>
+
+      <!-- ============ TAB: จัดการฟอร์มข้อมูล (admin) ============ -->
+      <section class="panel" id="panel-formbuilder">
+        <div class="card">
+          <h2 id="ffFormTitle">เพิ่มช่องข้อมูล</h2>
+          <div id="ffMsg"></div>
+          <div class="grid">
+            <div><label>ชื่อช่องข้อมูล *</label><input id="ffLabel" placeholder="เช่น ชื่อผู้ปกครอง"></div>
+            <div><label>ประเภทข้อมูล *</label>
+              <select id="ffType">
+                <option value="text">ข้อความทั่วไป</option>
+                <option value="number">ตัวเลข</option>
+                <option value="phone">เบอร์โทรศัพท์</option>
+                <option value="link">ลิงก์ (URL)</option>
+                <option value="dropdown">ดรอปดาวน์ (เลือกจากรายการ)</option>
+                <option value="image">รูปภาพ (อัปโหลดไฟล์)</option>
+                <option value="file">ไฟล์ (อัปโหลดไฟล์)</option>
+              </select>
+            </div>
+          </div>
+          <div id="ffOptionsWrap" style="display:none;margin-top:10px;">
+            <label>รายการตัวเลือก (1 บรรทัด = 1 ตัวเลือก)</label>
+            <textarea id="ffOptions" placeholder="เช่น&#10;ดีมาก&#10;ดี&#10;ปานกลาง"></textarea>
+          </div>
+          <br>
+          <button class="btn" id="btnSaveField">เพิ่มช่องข้อมูล</button>
+          <button class="btn secondary" id="btnCancelEditField" style="display:none;">ยกเลิก</button>
+        </div>
+
+        <div class="card">
+          <h2>ช่องข้อมูลที่มีอยู่</h2>
+          <button class="btn secondary small" id="btnRefreshFields">รีเฟรชรายการ</button>
+          <div id="ffList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการประชาสัมพันธ์ (admin) ============ -->
+      <section class="panel" id="panel-announcements">
+        <div class="card">
+          <h2 id="annFormTitle">เพิ่มประกาศใหม่</h2>
+          <div id="annMsg"></div>
+          <label>ข้อความประกาศ *</label>
+          <textarea id="annText" placeholder="พิมพ์ข้อความประกาศที่จะแสดงในหน้า login..."></textarea>
+          <br><br>
+          <label>รูปภาพแนบ (ไม่บังคับ)</label>
+          <input type="file" id="annImage" accept="image/*">
+          <br><br>
+          <button class="btn" id="btnSaveAnnouncement">เพิ่มประกาศ</button>
+          <button class="btn secondary" id="btnCancelEditAnnouncement" style="display:none;">ยกเลิก</button>
+        </div>
+
+        <div class="card">
+          <h2>ประกาศที่มีอยู่</h2>
+          <button class="btn secondary small" id="btnRefreshAnnouncements">รีเฟรชรายการ</button>
+          <div id="announcementsAdminList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: ลงทะเบียนนักเรียน (admin/teacher) ============ -->
+      <section class="panel" id="panel-register">
+        <div class="card">
+          <h2>เพิ่มนักเรียนใหม่</h2>
+          <div id="addMsg"></div>
+          <div class="grid">
+            <div id="addGradeWrap"><label>ระดับชั้น *</label><select id="addGrade"></select></div>
+            <div id="addRoomWrap"><label>ห้อง *</label><select id="addRoom"></select></div>
+            <div><label>รหัสชั่วคราวที่จะได้</label><input id="addTempPreview" value="กรุณาเลือกระดับชั้นและห้อง" disabled style="background:#f1f5f9;font-weight:600;"></div>
+          </div>
+          <div class="hint" id="teacherScopeHint" style="display:none;"></div>
+          <div class="hint">รหัสชั่วคราวคำนวณจากปี พ.ศ. + ระดับชั้น + ห้อง + ลำดับในชั้น/ห้องเดียวกัน — แก้ไขเองไม่ได้ (ยกเว้นแอดมินแก้ได้ทีหลังที่แท็บ "จัดการข้อมูล")<br>กำหนด<b>เบอร์โทร/รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล" หลังบันทึกแล้ว และอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ"<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
+
+          <div class="divider"></div>
+          <div id="addCustomFieldsWrap"><div class="hint">กำลังโหลดช่องข้อมูลเพิ่มเติม...</div></div>
+
+          <br>
+          <button class="btn" id="btnAddStudent">บันทึกนักเรียนใหม่</button>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการรูปภาพ (admin / teacher เห็นแค่ห้องตัวเอง) ============ -->
+      <section class="panel" id="panel-photos">
+        <div class="card">
+          <h2>จัดการรูปภาพนักเรียน</h2>
+          <div class="hint" id="photoTeacherScopeHint" style="display:none;"></div>
+          <div class="grid" id="photoFilterWrap">
+            <div><label>ระดับชั้น</label><select id="photoFilterGrade"><option value="">ทั้งหมด</option></select></div>
+            <div><label>ห้อง</label><select id="photoFilterRoom"><option value="">ทั้งหมด</option></select></div>
+            <div><label>ค้นหารหัส</label><input id="photoFilterQuery" placeholder="พิมพ์เพื่อค้นหา..."></div>
+          </div>
+          <br>
+          <button class="btn secondary small" id="btnPhotoListSearch">ค้นหา</button>
+
+          <div style="display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;">
+            <div style="flex:0 1 260px; min-width:220px;">
+              <div id="photoStudentList" class="hint">กดค้นหาเพื่อแสดงรายชื่อ</div>
+            </div>
+            <div style="flex:1 1 320px; min-width:260px;">
+              <div id="photoDetailPane" class="hint">เลือกรายชื่อทางซ้ายเพื่ออัปโหลด/เปลี่ยนรูป</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการข้อมูล (admin/teacher) ============ -->
+      <section class="panel" id="panel-dataManage">
+        <div class="subnav" id="dataManageSubnav">
+          <button data-sub="searchEdit" class="active">ค้นหา/แก้ไขข้อมูล</button>
+          <button data-sub="confirm">ยืนยันรหัสจริง</button>
+          <button data-sub="move">ย้ายห้อง</button>
+        </div>
+
+        <!-- sub: ค้นหา/แก้ไขข้อมูล -->
+        <div class="subpanel active" id="sub-searchEdit">
+          <div class="card">
+            <h2>ค้นหา / รายชื่อนักเรียนทั้งหมด</h2>
+            <div class="grid">
+              <div><label>คำค้นหา (ชื่อ/รหัส)</label><input id="searchQuery" placeholder="พิมพ์เพื่อค้นหา..."></div>
+              <div><label>ระดับชั้น</label><select id="searchGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้อง</label><select id="searchRoom"><option value="">ทั้งหมด</option></select></div>
+            </div>
+            <br>
+            <button class="btn" id="btnSearch">ค้นหา</button>
+            <div id="searchResults" style="margin-top:16px;"></div>
+          </div>
+
+          <div class="modal-overlay" id="editFormCard">
+            <div class="modal-box">
+              <button class="modal-close" id="btnCloseEditModal" type="button" title="ปิด">✕</button>
+              <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
+              <div id="editMsg"></div>
+              <div class="grid">
+                <div><label>เบอร์โทร</label><input id="editPhone"></div>
+              </div>
+              <div class="grid" style="margin-top:10px;">
+                <div>
+                  <label>รหัสนักเรียนจริง (ลบให้ว่างเพื่อยกเลิก กลับไปใช้รหัสชั่วคราว)</label>
+                  <div class="inline-form">
+                    <input id="editRealId">
+                    <button class="btn small secondary" id="btnSaveRealId" type="button">บันทึกรหัสจริง</button>
+                  </div>
+                </div>
+              </div>
+              <div class="grid" id="editTempIdWrap" style="display:none;margin-top:10px;">
+                <div>
+                  <label>รหัสชั่วคราว (แก้ไขได้เฉพาะแอดมิน)</label>
+                  <div class="inline-form">
+                    <input id="editTempId">
+                    <button class="btn small secondary" id="btnSaveTempId" type="button">บันทึกรหัสชั่วคราว</button>
+                  </div>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div id="editCustomFieldsWrap"></div>
+              <div id="editCustomFileFieldsWrap"></div>
+              <br>
+              <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- sub: ยืนยันรหัสจริง -->
+        <div class="subpanel" id="sub-confirm">
+          <div class="card">
+            <h2>จัดการรหัสนักเรียนจริง</h2>
+            <div class="hint">แสดงนักเรียนทุกคน (กรองชั้น/ห้องได้) — กรอกรหัสจริงแล้วกด "บันทึก" เพื่อยืนยัน/แก้ไข หรือลบข้อความให้ว่างแล้วกด "บันทึก" เพื่อยกเลิกรหัสจริง (กลับไปใช้รหัสชั่วคราว) ระบบจะเปลี่ยนชื่อไฟล์รูปเดิม (ตำแหน่งเดิม) ให้ตรงกับรหัสที่ใช้งานล่าสุดทันที</div>
+            <br>
+            <div class="grid" id="confirmFilterWrap">
+              <div><label>ระดับชั้น</label><select id="confirmFilterGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้อง</label><select id="confirmFilterRoom"><option value="">ทั้งหมด</option></select></div>
+            </div>
+            <br>
+            <button class="btn secondary small" id="btnRefreshConfirm">ค้นหา / รีเฟรชรายการ</button>
+            <div id="confirmList" style="margin-top:14px;"></div>
+          </div>
+        </div>
+
+        <!-- sub: ย้ายห้อง -->
+        <div class="subpanel" id="sub-move">
+          <div class="card">
+            <h2>ค้นหานักเรียนที่ต้องการย้ายห้อง</h2>
+            <div class="grid" id="moveFilterWrap">
+              <div><label>ระดับชั้นปัจจุบัน</label><select id="moveFilterGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้องปัจจุบัน</label><select id="moveFilterRoom"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ค้นหารหัส</label><input id="moveSearch" placeholder="ค้นหารหัส..."></div>
+            </div>
+            <br>
+            <button class="btn secondary small" id="btnMoveSearch">ค้นหา</button>
+            <div id="moveResults" style="margin-top:14px;"></div>
+          </div>
+
+          <div class="card" id="moveFormCard" style="display:none;">
+            <h2 id="moveFormTitle">ย้ายห้องให้ <span id="moveStudentLabel"></span></h2>
+            <div id="moveMsg"></div>
+            <p class="hint">ห้องปัจจุบัน: <b id="moveCurrentClass"></b></p>
+            <div class="grid">
+              <div><label>ระดับชั้นใหม่</label><select id="moveNewGrade"></select></div>
+              <div><label>ห้องใหม่</label><select id="moveNewRoom"></select></div>
+              <div id="moveDateWrap" style="display:none;"><label>วันที่ใหม่ (ไม่บังคับ ถ้าต้องการกำหนดใหม่)</label><input type="date" id="moveNewDate"></div>
+            </div>
+            <br>
+            <button class="btn" id="btnConfirmMove">ยืนยันการย้ายห้อง</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: จัดการข้อความ (admin) ============ -->
+      <section class="panel" id="panel-messages">
+        <div class="card">
+          <h2>คำขอย้ายห้อง / ลบ ที่รออนุมัติ</h2>
+          <button class="btn secondary small" id="btnRefreshRequests">รีเฟรชรายการ</button>
+          <div id="requestsMsg" style="margin-top:10px;"></div>
+          <div id="requestsList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: คำขอของฉัน (teacher) ============ -->
+      <section class="panel" id="panel-myRequests">
+        <div class="card">
+          <h2>คำขอที่ฉันส่งไป (ย้ายห้อง / ลบ)</h2>
+          <button class="btn secondary small" id="btnRefreshMyRequests">รีเฟรชรายการ</button>
+          <div id="myRequestsList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: การจัดส่งข้อมูล (admin) ============ -->
+      <section class="panel" id="panel-publish">
+        <div class="card">
+          <h2>รูปที่รออยู่ในโฟลเดอร์ชั่วคราว (รอเผยแพร่)</h2>
+          <div class="hint">เลือกรายการที่ต้องการเผยแพร่ ระบุวันที่กิจกรรม (ไม่บังคับ) แล้วกด "เผยแพร่"</div>
+          <br>
+          <button class="btn secondary small" id="btnRefreshPending">รีเฟรชรายการ</button>
+          <div id="pendingMsg" style="margin-top:10px;"></div>
+          <div id="pendingList" style="margin-top:14px;"></div>
+          <div class="divider"></div>
+          <div class="grid">
+            <div><label>วันที่กิจกรรม (ไม่ระบุ = ไม่มีโฟลเดอร์วันที่)</label><input type="date" id="publishDate"></div>
+          </div>
+          <br>
+          <button class="btn success" id="btnPublishSelected">เผยแพร่รายการที่เลือก</button>
+        </div>
+      </section>
+
+      <!-- ============ TAB: ข้อมูลของฉัน (student) ============ -->
+      <section class="panel" id="panel-student">
+        <div class="card">
+          <h2>ข้อมูลของฉัน</h2>
+          <div id="studentMsg"></div>
+          <div id="studentInfoBox">กำลังโหลด...</div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: ดาวน์โหลดข้อมูล (company) ============ -->
+      <section class="panel" id="panel-company">
+        <div class="card">
+          <h2>ค้นหาข้อมูลและรูปภาพนักเรียน</h2>
+          <div class="grid">
+            <div><label>วันที่กิจกรรม (ไม่ระบุ = ทุกวันที่)</label><input type="date" id="coDate"></div>
+            <div><label>ระดับชั้น</label><select id="coGrade"><option value="">ทั้งหมด</option></select></div>
+            <div><label>ห้อง</label><select id="coRoom"><option value="">ทั้งหมด</option></select></div>
+          </div>
+          <br>
+          <button class="btn" id="btnCoSearch">ค้นหา</button>
+          <div class="hint">ติ๊กเลือกรายการที่ต้องการ แล้วกดดาวน์โหลดด้านล่าง</div>
+          <div id="coResults" style="margin-top:16px;"></div>
+          <br>
+          <button class="btn secondary" id="btnCoDownload">ดาวน์โหลดรูปที่เลือก (ZIP + ข้อมูล CSV)</button>
+          <div id="coMsg" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ TAB: บัญชีของฉัน (admin/teacher/company) ============ -->
+      <section class="panel" id="panel-account">
+        <div class="card">
+          <h2>เปลี่ยนรหัสผ่านของฉัน</h2>
+          <div id="pwMsg"></div>
+          <div class="grid">
+            <div><label>รหัสผ่านเดิม</label><input type="password" id="pwOld"></div>
+            <div><label>รหัสผ่านใหม่</label><input type="password" id="pwNew"></div>
+          </div>
+          <br>
+          <button class="btn" id="btnChangePw">บันทึกรหัสผ่านใหม่</button>
+        </div>
+
+        <div class="card" id="adminUsersCard" style="display:none;">
+          <h2>จัดการบัญชีผู้ใช้งาน (ครู / บริษัท)</h2>
+          <div id="adminUsersMsg"></div>
+          <div id="adminUsersList">กำลังโหลด...</div>
+          <div class="divider"></div>
+          <h2>เพิ่มบัญชีใหม่</h2>
+          <div class="grid">
+            <div><label>บทบาท</label><select id="newUserRole"><option value="teacher">ครูที่ปรึกษา</option><option value="company">บริษัท</option><option value="admin">แอดมิน</option></select></div>
+            <div><label>Username</label><input id="newUserUsername"></div>
+            <div><label>Password</label><input id="newUserPassword"></div>
+            <div><label>ชื่อที่แสดง</label><input id="newUserDisplayName"></div>
+          </div>
+          <br>
+          <button class="btn" id="btnAddUser">เพิ่มบัญชี</button>
+          <div class="divider"></div>
+          <h2>สร้างบัญชีครูที่ปรึกษาแบบกลุ่ม</h2>
+          <div class="hint">Username = ช่วงชั้น(A/P/M) + ระดับชั้น + ห้อง เช่น M31 = ม.3 ห้อง 1 — ระบบจะสร้างห้อง 1 ถึงจำนวนที่ระบุ ทุกห้องใช้รหัสผ่านเดียวกันตอนสร้าง (แก้ทีหลังแยกห้องได้)</div>
+          <br>
+          <div id="bulkTeacherMsg"></div>
+          <div class="grid">
+            <div><label>ช่วงชั้น</label>
+              <select id="bulkLevel">
+                <option value="A">อนุบาล (A)</option>
+                <option value="P">ประถม (P)</option>
+                <option value="M">มัธยม (M)</option>
+              </select>
+            </div>
+            <div><label>ระดับชั้น</label><select id="bulkGradeDigit"></select></div>
+            <div><label>จำนวนห้อง</label><input type="number" id="bulkRoomCount" min="1" value="1"></div>
+            <div><label>รหัสผ่าน</label><input id="bulkPassword"></div>
+          </div>
+          <br>
+          <button class="btn" id="btnBulkCreateTeachers">สร้างบัญชี</button>
+          <div id="bulkResultList" style="margin-top:14px;"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // ===================================================================
+    // 🔌 เชื่อมต่อกับ Apps Script ผ่าน fetch() (เพราะไฟล์นี้ฝากไว้บน GitHub Pages
+    //    ไม่ได้รันอยู่ "ใน" Apps Script เหมือนไฟล์ Index.html ตัวต้นฉบับ)
+    //
+    //    Shim นี้สร้าง google.script.run จำลองขึ้นมาให้ใช้ syntax เดิมได้ทุกที่
+    //    (.withSuccessHandler().withFailureHandler().ชื่อฟังก์ชัน(args))
+    //    โดยเบื้องหลังจะยิง fetch() ไปคุยกับ Apps Script Web App จริงแทน
+    //    --> โค้ดส่วนที่เหลือทั้งหมดของไฟล์นี้ไม่ต้องแก้อะไรเลย ใช้ของเดิมได้ทุกบรรทัด
+    // ===================================================================
+
+    // ⚙️ แก้ URL นี้เป็น Web App URL ของคุณ ถ้า Deploy ใหม่แล้วได้ลิงก์เปลี่ยน (ปกติไม่ควรเปลี่ยนถ้าใช้ "New version")
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
+
+    async function callApi(action, args) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain เพื่อเลี่ยง CORS preflight
+        body: JSON.stringify({ action: action, args: args || [] })
       });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง: ' + text.slice(0, 200)); }
+      if (!json.success) throw new Error(json.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ');
+      return json.data;
+    }
 
-      sheet.getRange(row, COL.PHOTO_STATUS + 1, 1, 2).setValues([['published', dateStr]]);
-      count++;
-    } catch (e) { /* ข้ามรายการที่มีปัญหา ทำรายการอื่นต่อ */ }
-  });
-
-  return { ok: true, count: count };
-}
-
-// ========================= MOVE / DELETE (internal, ใช้ทั้งทางตรงและผ่านคำขอ) =========================
-function moveStudentClassInternal_(id, newGrade, newRoom, photoDateOverride) {
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const fileId = rowVals[COL.FILE_ID];
-  const status = rowVals[COL.PHOTO_STATUS];
-  let photoDate = String(rowVals[COL.PHOTO_DATE] || '').trim();
-  if (photoDateOverride !== undefined && photoDateOverride !== null && String(photoDateOverride).trim() !== '') {
-    photoDate = String(photoDateOverride).trim();
-  }
-
-  if (fileId && status === 'published') {
-    try {
-      const file = DriveApp.getFileById(fileId);
-      const newFolder = getClassFolder_(newGrade, newRoom, photoDate);
-      const parentIds = [];
-      const parents = file.getParents();
-      while (parents.hasNext()) parentIds.push(parents.next().getId());
-      newFolder.addFile(file);
-      parentIds.forEach(function (pid) {
-        if (pid !== newFolder.getId()) { try { DriveApp.getFolderById(pid).removeFile(file); } catch (e) { /* ignore */ } }
+    function createRunProxy_(successHandler, failureHandler) {
+      return new Proxy({}, {
+        get: function (target, prop) {
+          if (prop === 'withSuccessHandler') {
+            return function (fn) { return createRunProxy_(fn, failureHandler); };
+          }
+          if (prop === 'withFailureHandler') {
+            return function (fn) { return createRunProxy_(successHandler, fn); };
+          }
+          return function () {
+            const args = Array.prototype.slice.call(arguments);
+            callApi(prop, args)
+              .then(function (result) { if (successHandler) successHandler(result); })
+              .catch(function (err) { if (failureHandler) failureHandler(err); else console.error(prop, err); });
+          };
+        }
       });
-      sheet.getRange(row, COL.PHOTO_DATE + 1).setValue(photoDate);
-    } catch (e) { /* ไฟล์อาจถูกลบไปแล้ว ยังอัปเดตชีทต่อไปได้ */ }
-  }
-  sheet.getRange(row, COL.GRADE + 1, 1, 2).setValues([[newGrade, newRoom]]);
-}
-
-function deleteStudentInternal_(id) {
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const fileId = rowVals[COL.FILE_ID];
-  if (fileId) { try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) { /* ignore */ } }
-  sheet.deleteRow(row);
-}
-
-/** ย้ายห้องทันที — admin เท่านั้น (ครูต้องใช้ teacherRequestMove แทน) */
-function moveStudentClass(token, id, newGrade, newRoom, photoDateOverride) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  if (!newGrade || !newRoom) throw new Error('กรุณาระบุระดับชั้นและห้องใหม่');
-  moveStudentClassInternal_(id, newGrade, newRoom, photoDateOverride);
-  return { ok: true };
-}
-
-/** ลบทันที — admin เท่านั้น (ครูต้องใช้ teacherRequestDelete แทน) */
-function deleteStudent(token, id) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  deleteStudentInternal_(id);
-  return { ok: true };
-}
-
-// ========================= คำขอจากครู (ย้ายห้อง / ลบ) + ข้อความตอบกลับ =========================
-function getRequestsSheet_() {
-  const ss = getSpreadsheet_();
-  let sheet = ss.getSheetByName(REQUESTS_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(REQUESTS_SHEET_NAME);
-    sheet.appendRow(['ประเภท', 'StudentRecordId', 'รหัสนักเรียน', 'รายละเอียด', 'ผู้ขอ', 'วันที่ขอ', 'สถานะ', 'ข้อความตอบกลับ']);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
-}
-
-function teacherRequestMove(token, id, newGrade, newRoom) {
-  const session = validateSession_(token);
-  requireRole_(session, ['teacher', 'admin']);
-  if (!newGrade || !newRoom) throw new Error('กรุณาระบุระดับชั้นและห้องใหม่');
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const name = activeCode_(rowVals[COL.REAL_ID], rowVals[COL.TEMP_ID]);
-  const details = JSON.stringify({ newGrade: newGrade, newRoom: newRoom });
-  getRequestsSheet_().appendRow(['ย้ายห้อง', id, name, details, session.username, new Date(), 'รออนุมัติ', '']);
-  return { ok: true };
-}
-
-function teacherRequestDelete(token, id) {
-  const session = validateSession_(token);
-  requireRole_(session, ['teacher', 'admin']);
-  const row = findRowByRecordId_(id);
-  const sheet = getSheet();
-  const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-  const name = activeCode_(rowVals[COL.REAL_ID], rowVals[COL.TEMP_ID]);
-  getRequestsSheet_().appendRow(['ลบ', id, name, '', session.username, new Date(), 'รออนุมัติ', '']);
-  return { ok: true };
-}
-
-/** ดึงข้อมูลล่าสุดของนักเรียน (รหัสจริง/ชั่วคราว/ข้อมูลเพิ่มเติม) แบบปลอดภัย ถ้าถูกลบไปแล้วจะได้ null กลับมา */
-function getStudentSnapshot_(id) {
-  try {
-    const row = findRowByRecordId_(id);
-    const sheet = getSheet();
-    const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-    const obj = rowToObject_(rowVals);
-    return { realId: obj.realId, tempId: obj.tempId, customFields: obj.customFields };
-  } catch (e) {
-    return null;
-  }
-}
-
-function adminListRequests(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getRequestsSheet_();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, 8).getValues();
-  const result = [];
-  data.forEach(function (r, idx) {
-    if (r[6] !== 'รออนุมัติ') return;
-    const studentNow = getStudentSnapshot_(r[1]);
-    result.push({
-      requestRow: idx + 2,
-      type: r[0],
-      studentId: r[1],
-      studentName: r[2],
-      studentNow: studentNow,
-      details: r[3] ? JSON.parse(r[3]) : null,
-      requestedBy: r[4],
-      requestedAt: r[5] ? new Date(r[5]).toLocaleString('th-TH') : '',
-      status: r[6]
-    });
-  });
-  return result;
-}
-
-/** ครูดูคำขอของตัวเอง (ทุกสถานะ) พร้อมข้อความตอบกลับจากแอดมิน */
-function getMyRequests(token) {
-  const session = validateSession_(token);
-  requireRole_(session, ['teacher', 'admin']);
-  const sheet = getRequestsSheet_();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, 8).getValues();
-  const result = [];
-  data.forEach(function (r, idx) {
-    if (r[4] !== session.username) return;
-    result.push({
-      requestRow: idx + 2,
-      type: r[0],
-      studentName: r[2],
-      studentNow: getStudentSnapshot_(r[1]),
-      details: r[3] ? JSON.parse(r[3]) : null,
-      requestedAt: r[5] ? new Date(r[5]).toLocaleString('th-TH') : '',
-      status: r[6],
-      replyMessage: r[7] || ''
-    });
-  });
-  result.reverse();
-  return result;
-}
-
-/** decision: 'approve' | 'reject', photoDate: ใช้เฉพาะคำขอย้ายห้อง (ไม่บังคับ), replyMessage: ข้อความตอบกลับให้ครูเห็น */
-function adminHandleRequest(token, requestRow, decision, photoDate, replyMessage) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const reqSheet = getRequestsSheet_();
-  const reqVals = reqSheet.getRange(requestRow, 1, 1, 8).getValues()[0];
-  const type = reqVals[0], studentId = reqVals[1], detailsRaw = reqVals[3];
-
-  if (decision === 'approve') {
-    try {
-      if (type === 'ย้ายห้อง') {
-        const details = JSON.parse(detailsRaw);
-        moveStudentClassInternal_(studentId, details.newGrade, details.newRoom, photoDate);
-      } else if (type === 'ลบ') {
-        deleteStudentInternal_(studentId);
-      }
-      reqSheet.getRange(requestRow, 7).setValue('อนุมัติแล้ว');
-    } catch (e) {
-      reqSheet.getRange(requestRow, 7).setValue('ผิดพลาด: ' + e.message);
-      reqSheet.getRange(requestRow, 8).setValue(replyMessage || '');
-      throw e;
     }
-  } else {
-    reqSheet.getRange(requestRow, 7).setValue('ปฏิเสธ');
-  }
-  reqSheet.getRange(requestRow, 8).setValue(replyMessage || '');
-  return { ok: true };
-}
 
-// ========================= บริษัท: ค้นหา + ดาวน์โหลดเฉพาะที่เลือก =========================
-function companySearchStudents(token, filters) {
-  const session = validateSession_(token);
-  requireRole_(session, ['company', 'admin', 'teacher']);
-  const sheet = getSheet();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, COLUMNS.length).getValues();
+    window.google = { script: { run: createRunProxy_() } };
+    // ===================================================================
+    // ↑↑↑ จบส่วนเชื่อมต่อ API — โค้ดด้านล่างทั้งหมดเหมือนเดิมทุกบรรทัด ↓↓↓
+    // ===================================================================
 
-  const result = [];
-  data.forEach(function (row) {
-    if (row[COL.PHOTO_STATUS] !== 'published') return; // บริษัทเห็นแค่รูปที่เผยแพร่แล้ว
-    if (filters) {
-      if (filters.grade && row[COL.GRADE] !== filters.grade) return;
-      if (filters.room && String(row[COL.ROOM]) !== String(filters.room)) return;
-      if (filters.date) {
-        const rowDate = String(row[COL.PHOTO_DATE] || '').trim();
-        if (rowDate !== filters.date) return;
-      }
-    }
-    const obj = rowToObject_(row);
-    delete obj.phone;
-    delete obj.customFields;
-    result.push(obj);
-  });
-  return result;
-}
+    // ===================================================================
+    // ⚙️ แก้รายชื่อ "ระดับชั้น" และ "ห้อง" ที่ต้องการให้เลือกได้ที่นี่
+    // ===================================================================
+    const gradeOptions = [
+      'อนุบาล 1', 'อนุบาล 2', 'อนุบาล 3',
+      'ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6',
+      'ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'
+    ];
+    const roomOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    // ===================================================================
 
-/** ids: รายการ RecordId ที่ติ๊กเลือกไว้ -> สร้าง ZIP (รูปที่เลือก + ข้อมูล.csv) */
-function companyDownloadSelected(token, ids) {
-  const session = validateSession_(token);
-  requireRole_(session, ['company', 'admin', 'teacher']);
-  if (!ids || !ids.length) throw new Error('กรุณาเลือกรูปที่ต้องการดาวน์โหลดอย่างน้อย 1 รายการ');
+    let TOKEN = sessionStorage.getItem('sps_token') || null;
+    let ROLE = sessionStorage.getItem('sps_role') || null;
+    let DISPLAY_NAME = sessionStorage.getItem('sps_name') || null;
+    let MY_ID = sessionStorage.getItem('sps_id') || null;
 
-  const sheet = getSheet();
-  const blobs = [];
-  const csvRows = [['รหัสนักเรียน', 'ระดับชั้น', 'ห้อง', 'วันที่ของรูป', 'ชื่อไฟล์']];
+    let currentMoveStudent = null;
+    let currentEditId = null;
+    let editingFieldId = null;
+    let formFields = [];
 
-  ids.forEach(function (id) {
-    try {
-      const row = findRowByRecordId_(id);
-      const rowVals = sheet.getRange(row, 1, 1, COLUMNS.length).getValues()[0];
-      if (rowVals[COL.PHOTO_STATUS] !== 'published' || !rowVals[COL.FILE_ID]) return;
-      const file = DriveApp.getFileById(rowVals[COL.FILE_ID]);
-      blobs.push(file.getBlob());
-      csvRows.push([
-        activeCode_(rowVals[COL.REAL_ID], rowVals[COL.TEMP_ID]),
-        rowVals[COL.GRADE], rowVals[COL.ROOM], rowVals[COL.PHOTO_DATE] || '', rowVals[COL.PHOTO_FILE]
-      ]);
-    } catch (e) { /* ข้ามรายการที่มีปัญหา */ }
-  });
-
-  if (!blobs.length) throw new Error('ไม่พบไฟล์รูปที่เลือก');
-
-  const csvContent = '\uFEFF' + csvRows.map(function (r) {
-    return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
-  }).join('\n');
-  blobs.push(Utilities.newBlob(csvContent, 'text/csv', 'ข้อมูล.csv'));
-
-  const zipBlob = Utilities.zip(blobs, 'student_photos.zip');
-  return { base64: Utilities.base64Encode(zipBlob.getBytes()), filename: 'student_photos_' + new Date().getTime() + '.zip' };
-}
-
-// ========================= ประชาสัมพันธ์ (แสดงที่หน้า login, แอดมินจัดการ) =========================
-const ANNOUNCEMENTS_SHEET_NAME = 'ประชาสัมพันธ์';
-const ANNOUNCEMENT_FOLDER_NAME = 'รูปประชาสัมพันธ์';
-
-function getAnnouncementsSheet_() {
-  const ss = getSpreadsheet_();
-  let sheet = ss.getSheetByName(ANNOUNCEMENTS_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(ANNOUNCEMENTS_SHEET_NAME);
-    sheet.appendRow(['AnnouncementId', 'ข้อความ', 'รูปภาพFileId', 'ลำดับ', 'วันที่สร้าง']);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
-}
-
-function getAnnouncementFolder_() {
-  return getOrCreateSubFolder_(getRootFolder_(), ANNOUNCEMENT_FOLDER_NAME);
-}
-
-/** สาธารณะ — ไม่ต้อง login เพราะใช้แสดงที่หน้า login ก่อนเข้าสู่ระบบ */
-function getAnnouncements() {
-  const sheet = getAnnouncementsSheet_();
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  const data = sheet.getRange(2, 1, last - 1, 5).getValues();
-  const result = data.map(function (r) {
-    return {
-      id: r[0],
-      text: r[1] || '',
-      imageUrl: r[2] ? ('https://drive.google.com/thumbnail?id=' + r[2] + '&sz=w400') : '',
-      order: r[3] || 0
+    const FIELD_TYPE_LABELS = {
+      text: 'ข้อความทั่วไป', number: 'ตัวเลข', phone: 'เบอร์โทรศัพท์', link: 'ลิงก์ (URL)',
+      dropdown: 'ดรอปดาวน์', image: 'รูปภาพ', file: 'ไฟล์'
     };
-  });
-  result.sort(function (a, b) { return a.order - b.order; });
-  return result;
-}
 
-/** imageBase64/imageMime/imageName ส่ง null มาได้ถ้าไม่แนบรูป */
-function adminAddAnnouncement(token, text, imageBase64, imageMime, imageName) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  text = (text || '').toString().trim();
-  if (!text) throw new Error('กรุณากรอกข้อความประกาศ');
+    const TAB_LABELS = {
+      formbuilder: 'จัดการฟอร์มข้อมูล', announcements: 'จัดการประชาสัมพันธ์', register: 'ลงทะเบียนนักเรียน', photos: 'จัดการรูปภาพ', dataManage: 'จัดการข้อมูล',
+      messages: 'จัดการข้อความ', myRequests: 'คำขอของฉัน', publish: 'การจัดส่งข้อมูล',
+      student: 'ข้อมูลของฉัน', company: 'ดาวน์โหลดข้อมูล', account: 'บัญชีของฉัน'
+    };
+    const ROLE_TABS = {
+      admin: ['formbuilder', 'announcements', 'register', 'photos', 'dataManage', 'messages', 'publish', 'account'],
+      teacher: ['register', 'photos', 'dataManage', 'myRequests', 'account'],
+      student: ['student'],
+      company: ['company', 'account']
+    };
+    const ROLE_THAI = { admin: 'ผู้ดูแลระบบ', teacher: 'ครูที่ปรึกษา', student: 'นักเรียน', company: 'บริษัท' };
+    let MY_SCOPE = null; // ขอบเขตห้องของครู (ถ้าเป็น role teacher) — { grade, room, label }
 
-  const sheet = getAnnouncementsSheet_();
-  const id = Utilities.getUuid();
-  const order = sheet.getLastRow();
+    // ---------------------------------------------------------------
+    // INIT dropdowns (ชั้น/ห้อง คงที่ ไม่ต้องรอ server)
+    // ---------------------------------------------------------------
+    fillSelect(document.getElementById('addGrade'), gradeOptions, null);
+    fillSelect(document.getElementById('addRoom'), roomOptions, null);
+    fillSelect(document.getElementById('moveNewGrade'), gradeOptions, null);
+    fillSelect(document.getElementById('moveNewRoom'), roomOptions, null);
+    fillSelect(document.getElementById('searchGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('searchRoom'), roomOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('confirmFilterGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('confirmFilterRoom'), roomOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('moveFilterGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('moveFilterRoom'), roomOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('coGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('coRoom'), roomOptions, 'ทั้งหมด');
 
-  let fileId = '';
-  if (imageBase64) {
-    const folder = getAnnouncementFolder_();
-    const extMatch = String(imageName || '').match(/\.[^.]+$/);
-    const ext = extMatch ? extMatch[0] : '.jpg';
-    const bytes = Utilities.base64Decode(imageBase64);
-    const blob = Utilities.newBlob(bytes, imageMime, id + ext);
-    const file = folder.createFile(blob);
-    fileId = file.getId();
-  }
-
-  sheet.appendRow([id, text, fileId, order, new Date()]);
-  return { id: id };
-}
-
-function adminUpdateAnnouncement(token, id, text) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  text = (text || '').toString().trim();
-  if (!text) throw new Error('กรุณากรอกข้อความประกาศ');
-  const sheet = getAnnouncementsSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 5).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === id) {
-      sheet.getRange(i + 2, 2).setValue(text);
-      return { ok: true };
+    document.getElementById('addGrade').addEventListener('change', updateTempIdPreview);
+    document.getElementById('addRoom').addEventListener('change', updateTempIdPreview);
+    function updateTempIdPreview() {
+      const grade = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.grade : document.getElementById('addGrade').value;
+      const room = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.room : document.getElementById('addRoom').value;
+      const preview = document.getElementById('addTempPreview');
+      if (!grade || !room) { preview.value = 'กรุณาเลือกระดับชั้นและห้อง'; return; }
+      preview.value = 'กำลังคำนวณ...';
+      google.script.run
+        .withSuccessHandler(function (res) { preview.value = res.tempId; })
+        .withFailureHandler(function (err) { preview.value = 'คำนวณไม่ได้: ' + err.message; })
+        .previewTempId(TOKEN, grade, room);
     }
-  }
-  throw new Error('ไม่พบประกาศนี้');
-}
 
-function adminDeleteAnnouncement(token, id) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getAnnouncementsSheet_();
-  const last = sheet.getLastRow();
-  const data = sheet.getRange(2, 1, last - 1, 5).getValues();
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === id) {
-      const fileId = data[i][2];
-      if (fileId) { try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) { /* ignore */ } }
-      sheet.deleteRow(i + 2);
-      return { ok: true };
+    if (TOKEN && ROLE) showApp();
+    loadPublicAnnouncements();
+
+    function loadPublicAnnouncements() {
+      google.script.run
+        .withSuccessHandler(function (list) {
+          const block = document.getElementById('announcementBlock');
+          const container = document.getElementById('announcementList');
+          if (!list || !list.length) { block.style.display = 'none'; return; }
+          let html = '';
+          list.forEach(function (a) {
+            html += '<div class="announcement-item">';
+            if (a.imageUrl) html += '<img src="' + a.imageUrl + '">';
+            html += '<p>' + escapeHtml(a.text) + '</p>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+          block.style.display = 'block';
+        })
+        .withFailureHandler(function (err) { console.error('โหลดประกาศไม่สำเร็จ', err); })
+        .getAnnouncements();
     }
-  }
-  throw new Error('ไม่พบประกาศนี้');
-}
 
-/** สลับลำดับก่อน-หลังของประกาศ: direction = 'up' | 'down' */
-function adminMoveAnnouncement(token, id, direction) {
-  const session = validateSession_(token);
-  requireRole_(session, ['admin']);
-  const sheet = getAnnouncementsSheet_();
-  const last = sheet.getLastRow();
-  if (last < 3) return { ok: true };
-  const data = sheet.getRange(2, 1, last - 1, 5).getValues();
+    function fillSelect(select, options, placeholder) {
+      select.innerHTML = '';
+      if (placeholder) { const o = document.createElement('option'); o.value = ''; o.textContent = placeholder; select.appendChild(o); }
+      options.forEach(function (v) { const o = document.createElement('option'); o.value = v; o.textContent = v; select.appendChild(o); });
+    }
+    function showMsg(elId, text, type) {
+      const el = document.getElementById(elId);
+      el.innerHTML = '<div class="msg ' + type + '">' + escapeHtml(text) + '</div>';
+      setTimeout(function () { el.innerHTML = ''; }, 5000);
+    }
+    function statusBadge(s) {
+      if (s.photoStatus === 'published') return '<span class="badge status-published">เผยแพร่แล้ว</span>';
+      if (s.photoStatus === 'pending') return '<span class="badge status-pending">รอเผยแพร่</span>';
+      return '<span class="badge status-none">ไม่มีรูป</span>';
+    }
+    function requestStatusBadge(status) {
+      if (status === 'อนุมัติแล้ว') return '<span class="badge status-approved">อนุมัติแล้ว</span>';
+      if (status === 'ปฏิเสธ') return '<span class="badge status-rejected">ปฏิเสธ</span>';
+      if (status === 'รออนุมัติ') return '<span class="badge status-waiting">รออนุมัติ</span>';
+      return '<span class="badge status-rejected">' + escapeHtml(status) + '</span>';
+    }
+    function badgeFor(s) {
+      return s.realId ? '<span class="badge real">' + escapeHtml(s.realId) + '</span>' : '<span class="badge temp">' + escapeHtml(s.tempId) + '</span>';
+    }
+    /** แสดงรหัสจริง + รหัสชั่วคราว คู่กันเสมอ (รหัสชั่วคราวมีตลอด ส่วนรหัสจริงโชว์เพิ่มถ้ามีแล้ว) */
+    function bothCodesFor(s) {
+      let html = '<span class="badge temp">ชั่วคราว: ' + escapeHtml(s.tempId) + '</span>';
+      if (s.realId) html += ' <span class="badge real">จริง: ' + escapeHtml(s.realId) + '</span>';
+      return html;
+    }
+    /** สรุปค่าฟิลด์เพิ่มเติมทั้งหมด (ไม่รวมไฟล์/รูป) เป็นข้อความเดียว เช่น "ชื่อ: สมชาย | เบอร์โทร: 0812345678" */
+    function formatCustomFieldsSummary(customFields) {
+      if (!customFields || !formFields.length) return '-';
+      const parts = [];
+      formFields.forEach(function (f) {
+        if (fieldIsFile(f)) return;
+        const val = customFields[f.id];
+        if (val) parts.push('<b>' + escapeHtml(f.label) + ':</b> ' + escapeHtml(val));
+      });
+      return parts.length ? parts.join(' &nbsp;|&nbsp; ') : '-';
+    }
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+    }
+    function escapeJs(str) { return String(str || '').replace(/'/g, "\\'"); }
+    function fileToBase64(file, cb) {
+      const reader = new FileReader();
+      reader.onload = function () { cb(reader.result.split(',')[1]); };
+      reader.readAsDataURL(file);
+    }
 
-  const indexed = data.map(function (r, i) { return { rowNum: i + 2, id: r[0], order: r[3] || 0 }; });
-  indexed.sort(function (a, b) { return a.order - b.order; });
+    // ---------------------------------------------------------------
+    // LOGIN / LOGOUT
+    // ---------------------------------------------------------------
+    document.getElementById('btnLogin').addEventListener('click', doLogin);
+    document.getElementById('loginPassword').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
 
-  const pos = indexed.findIndex(function (x) { return x.id === id; });
-  if (pos === -1) throw new Error('ไม่พบประกาศนี้');
+    function doLogin() {
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      if (!username || !password) { showMsg('loginMsg', 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน', 'error'); return; }
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+          TOKEN = res.token; ROLE = res.role; DISPLAY_NAME = res.displayName; MY_ID = res.studentId;
+          sessionStorage.setItem('sps_token', TOKEN);
+          sessionStorage.setItem('sps_role', ROLE);
+          sessionStorage.setItem('sps_name', DISPLAY_NAME);
+          if (MY_ID) sessionStorage.setItem('sps_id', MY_ID);
+          showApp();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+          showMsg('loginMsg', err.message, 'error');
+        })
+        .login(username, password);
+    }
 
-  const targetPos = (direction === 'up') ? pos - 1 : pos + 1;
-  if (targetPos < 0 || targetPos >= indexed.length) return { ok: true };
+    document.getElementById('btnLogout').addEventListener('click', function () {
+      google.script.run.logout(TOKEN);
+      sessionStorage.clear();
+      TOKEN = null; ROLE = null; MY_SCOPE = null;
+      formFields = []; lastSearchResults = []; photoListCache = [];
+      document.getElementById('appScreen').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('loginUsername').value = '';
+      document.getElementById('loginPassword').value = '';
+    });
 
-  const a = indexed[pos], b = indexed[targetPos];
-  sheet.getRange(a.rowNum, 4).setValue(b.order);
-  sheet.getRange(b.rowNum, 4).setValue(a.order);
-  return { ok: true };
-}
+    function handleAuthError(err) {
+      if (/เข้าสู่ระบบ|เซสชัน|สิทธิ์/.test(err.message)) {
+        alert(err.message + ' กรุณาเข้าสู่ระบบใหม่');
+        sessionStorage.clear();
+        document.getElementById('appScreen').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        return true;
+      }
+      return false;
+    }
 
-// ========================= SETUP (รันมือครั้งแรกเพื่อเชื่อมต่อ/อนุญาตสิทธิ์ Google) =========================
-/**
- * รันฟังก์ชันนี้มือ 1 ครั้งจากใน Apps Script editor (เลือก "setup" ที่ dropdown ด้านบน แล้วกด Run ▶️)
- * เพื่อกระตุ้นหน้าขออนุญาตสิทธิ์ และสร้างชีท/โฟลเดอร์ที่จำเป็นทั้งหมดล่วงหน้า
- */
-function setup() {
-  getSheet();
-  getUsersSheet_();
-  getFormFieldsSheet_();
-  getRequestsSheet_();
-  getAnnouncementsSheet_();
-  getRootFolder_();
-  getTempFolder_();
-  getCustomFilesFolder_();
-  getAnnouncementFolder_();
-  Logger.log('ตั้งค่าเริ่มต้นเสร็จสมบูรณ์ — เปิด Google Sheet ของคุณ ควรเห็นชีท "นักเรียน", "ผู้ใช้งานระบบ", "ฟอร์มข้อมูล", "คำขอ", "ประชาสัมพันธ์" แล้ว');
-}
+    // ---------------------------------------------------------------
+    // SHOW APP
+    // ---------------------------------------------------------------
+    function showApp() {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appScreen').style.display = 'block';
+      document.getElementById('userLabel').textContent = DISPLAY_NAME + ' (' + (ROLE_THAI[ROLE] || ROLE) + ')';
+      document.getElementById('adminUsersCard').style.display = (ROLE === 'admin') ? 'block' : 'none';
+      document.getElementById('moveDateWrap').style.display = (ROLE === 'admin') ? 'block' : 'none';
 
-// ========================= MENU (เปิดจากหน้า Google Sheet) =========================
-function onOpen() {
-  SpreadsheetApp.getUi().createMenu('ระบบรูปภาพนักเรียน')
-    .addItem('วิธีเปิดเว็บแอป', 'showWebAppInfo_')
-    .addToUi();
-}
-function showWebAppInfo_() {
-  const url = ScriptApp.getService().getUrl();
-  const msg = url ? ('เปิดเว็บแอประบบได้ที่:\n' + url) : 'ยังไม่ได้ Deploy เว็บแอป กรุณาไปที่ Deploy > New deployment > Web app';
-  SpreadsheetApp.getUi().alert(msg);
-}
+      // รีเซ็ตทุกครั้งที่ล็อกอินใหม่ — กันค่าจากเซสชันครูคนก่อนติดค้างอยู่ (เช่น สลับมา login เป็นแอดมินแล้วยังเห็นแค่ห้องเดิม)
+      MY_SCOPE = null;
+      ['addGradeWrap', 'addRoomWrap', 'photoFilterWrap', 'confirmFilterWrap', 'moveFilterWrap'].forEach(function (id) {
+        document.getElementById(id).style.display = '';
+      });
+      document.getElementById('teacherScopeHint').style.display = 'none';
+      document.getElementById('photoTeacherScopeHint').style.display = 'none';
+
+      const nav = document.getElementById('tabNav');
+      nav.innerHTML = '';
+      const tabs = ROLE_TABS[ROLE] || [];
+      tabs.forEach(function (tab, i) {
+        const btn = document.createElement('button');
+        btn.textContent = TAB_LABELS[tab];
+        btn.dataset.tab = tab;
+        if (i === 0) btn.classList.add('active');
+        btn.addEventListener('click', function () { switchTab(tab); });
+        nav.appendChild(btn);
+      });
+
+      if (ROLE === 'admin' || ROLE === 'teacher') {
+        loadFormFieldsGlobal(function () {
+          renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
+        });
+      }
+
+      if (ROLE === 'teacher') {
+        google.script.run
+          .withSuccessHandler(function (scope) {
+            MY_SCOPE = scope;
+            document.getElementById('addGradeWrap').style.display = 'none';
+            document.getElementById('addRoomWrap').style.display = 'none';
+            document.getElementById('teacherScopeHint').style.display = 'block';
+            document.getElementById('teacherScopeHint').textContent = 'ห้องของคุณ: ' + scope.label + ' (กำหนดให้อัตโนมัติ)';
+            document.getElementById('photoFilterWrap').style.display = 'none';
+            document.getElementById('photoTeacherScopeHint').style.display = 'block';
+            document.getElementById('photoTeacherScopeHint').textContent = 'แสดงเฉพาะห้องของคุณ: ' + scope.label;
+            document.getElementById('confirmFilterWrap').style.display = 'none';
+            document.getElementById('moveFilterWrap').style.display = 'none';
+            updateTempIdPreview();
+          })
+          .withFailureHandler(function (err) { console.error('โหลดขอบเขตห้องครูไม่สำเร็จ', err); })
+          .getMyScope(TOKEN);
+      }
+
+      if (tabs.length) switchTab(tabs[0]);
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('#tabNav button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      const panel = document.getElementById('panel-' + tab);
+      if (panel) panel.classList.add('active');
+
+      if (tab === 'formbuilder') loadFormFieldsList();
+      if (tab === 'announcements') loadAnnouncementsAdminList();
+      if (tab === 'photos') loadPhotoTab();
+      if (tab === 'dataManage') switchSubTab('searchEdit');
+      if (tab === 'student') loadMyInfo();
+      if (tab === 'account') loadAccountTab();
+      if (tab === 'publish') loadPendingList();
+      if (tab === 'messages') loadRequestsList();
+      if (tab === 'myRequests') loadMyRequestsList();
+    }
+
+    document.querySelectorAll('#dataManageSubnav button').forEach(function (b) {
+      b.addEventListener('click', function () { switchSubTab(b.dataset.sub); });
+    });
+    function switchSubTab(sub) {
+      document.querySelectorAll('#dataManageSubnav button').forEach(function (b) { b.classList.toggle('active', b.dataset.sub === sub); });
+      document.querySelectorAll('.subpanel').forEach(function (p) { p.classList.remove('active'); });
+      const panel = document.getElementById('sub-' + sub);
+      if (panel) panel.classList.add('active');
+      if (sub === 'confirm') loadConfirmList();
+    }
+
+    // ===================================================================
+    // ฟิลด์ข้อมูลเพิ่มเติม (Custom Fields) — helper ใช้ร่วมกันหลายแท็บ
+    // ===================================================================
+    function fieldIsInline(f) { return f.type !== 'image' && f.type !== 'file'; }
+    function fieldIsFile(f) { return f.type === 'image' || f.type === 'file'; }
+
+    function loadFormFieldsGlobal(cb) {
+      google.script.run
+        .withSuccessHandler(function (fields) { formFields = fields; if (cb) cb(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) console.error(err); })
+        .getFormFields(TOKEN);
+    }
+
+    /** วาดช่อง input สำหรับฟิลด์ที่ไม่ใช่ไฟล์ (text/number/phone/link/dropdown) */
+    function renderCustomFieldInputs(containerId, fields, existingValues) {
+      existingValues = existingValues || {};
+      const container = document.getElementById(containerId);
+      if (!fields.length) { container.innerHTML = '<div class="hint">ยังไม่มีช่องข้อมูลเพิ่มเติม (ไปเพิ่มได้ที่แท็บ "จัดการฟอร์มข้อมูล")</div>'; return; }
+      let html = '';
+      fields.forEach(function (f) {
+        const val = existingValues[f.id] || '';
+        html += '<div class="cf-field"><label>' + escapeHtml(f.label) + '</label>';
+        if (f.type === 'dropdown') {
+          html += '<select class="cfInput" data-field="' + f.id + '"><option value="">- เลือก -</option>';
+          (f.options || []).forEach(function (opt) {
+            html += '<option value="' + escapeHtml(opt) + '"' + (val === opt ? ' selected' : '') + '>' + escapeHtml(opt) + '</option>';
+          });
+          html += '</select>';
+        } else {
+          const inputType = (f.type === 'number') ? 'number' : (f.type === 'phone' ? 'tel' : 'text');
+          html += '<input type="' + inputType + '" class="cfInput" data-field="' + f.id + '" value="' + escapeHtml(val) + '">';
+        }
+        html += '</div>';
+      });
+      container.innerHTML = html;
+    }
+    function collectCustomFieldValues(containerId) {
+      const obj = {};
+      document.querySelectorAll('#' + containerId + ' .cfInput').forEach(function (el) { obj[el.dataset.field] = el.value; });
+      return obj;
+    }
+
+    /** วาดช่องอัปโหลดไฟล์สำหรับฟิลด์ประเภท image/file (ใช้ตอนนักเรียนถูกสร้างแล้ว/แก้ไข) */
+    function renderCustomFileFields(containerId, fields, studentId, existingValues) {
+      existingValues = existingValues || {};
+      const fileFields = fields.filter(fieldIsFile);
+      const container = document.getElementById(containerId);
+      if (!fileFields.length) { container.innerHTML = ''; return; }
+      let html = '<div class="divider"></div><h3 style="font-size:14px;margin:0 0 10px;">ไฟล์/รูปเพิ่มเติม</h3>';
+      fileFields.forEach(function (f) {
+        const val = existingValues[f.id];
+        html += '<div class="cf-field" data-cffield="' + f.id + '"><label>' + escapeHtml(f.label) + '</label>';
+        if (val && val.url) {
+          html += (f.type === 'image')
+            ? '<img class="thumb" style="width:60px;height:60px;margin-bottom:6px;" src="' + val.url + '">'
+            : '<div class="hint">ไฟล์ปัจจุบัน: ' + escapeHtml(val.fileName || '') + '</div>';
+        }
+        html += '<input type="file" class="cfFileInput" data-field="' + f.id + '" data-student="' + studentId + '">' +
+          ' <button class="btn small" type="button" onclick="uploadCustomFile(\'' + studentId + '\',\'' + f.id + '\', this)">อัปโหลด</button>' +
+          '<span class="cfFileStatus" data-field="' + f.id + '"></span></div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function uploadCustomFile(studentId, fieldId, btnEl) {
+      const input = document.querySelector('.cfFileInput[data-field="' + fieldId + '"][data-student="' + studentId + '"]');
+      if (!input.files.length) { alert('กรุณาเลือกไฟล์ก่อน'); return; }
+      const file = input.files[0];
+      btnEl.disabled = true; btnEl.textContent = 'กำลังอัปโหลด...';
+      fileToBase64(file, function (base64) {
+        google.script.run
+          .withSuccessHandler(function () {
+            btnEl.disabled = false; btnEl.textContent = 'อัปโหลด';
+            const status = document.querySelector('.cfFileStatus[data-field="' + fieldId + '"]');
+            if (status) status.textContent = ' สำเร็จ ✓';
+          })
+          .withFailureHandler(function (err) {
+            btnEl.disabled = false; btnEl.textContent = 'อัปโหลด';
+            if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+          })
+          .uploadCustomFieldFile(TOKEN, studentId, fieldId, base64, file.type, file.name);
+      });
+    }
+
+    // ===================================================================
+    // TAB: จัดการฟอร์มข้อมูล (admin)
+    // ===================================================================
+    document.getElementById('ffType').addEventListener('change', function () {
+      document.getElementById('ffOptionsWrap').style.display = (this.value === 'dropdown') ? 'block' : 'none';
+    });
+
+    function loadFormFieldsList() {
+      const container = document.getElementById('ffList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(function (fields) { formFields = fields; renderFormFieldsList(fields); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getFormFields(TOKEN);
+    }
+    document.getElementById('btnRefreshFields').addEventListener('click', loadFormFieldsList);
+
+    function renderFormFieldsList(fields) {
+      const container = document.getElementById('ffList');
+      if (!fields.length) { container.innerHTML = '<div class="empty">ยังไม่มีช่องข้อมูลเพิ่มเติม</div>'; return; }
+      let html = '<table><tr><th>ลำดับ</th><th></th><th>ชื่อช่อง</th><th>ประเภท</th><th>ตัวเลือก</th><th></th></tr>';
+      fields.forEach(function (f, idx) {
+        const upDisabled = (idx === 0) ? 'disabled' : '';
+        const downDisabled = (idx === fields.length - 1) ? 'disabled' : '';
+        html += '<tr>' +
+          '<td>' + escapeHtml(f.order) + '</td>' +
+          '<td>' +
+            '<button class="btn small secondary" ' + upDisabled + ' onclick="moveField(\'' + escapeJs(f.id) + '\',\'up\')" title="เลื่อนขึ้น">▲</button> ' +
+            '<button class="btn small secondary" ' + downDisabled + ' onclick="moveField(\'' + escapeJs(f.id) + '\',\'down\')" title="เลื่อนลง">▼</button>' +
+          '</td>' +
+          '<td>' + escapeHtml(f.label) + '</td>' +
+          '<td><span class="badge type">' + escapeHtml(FIELD_TYPE_LABELS[f.type] || f.type) + '</span></td>' +
+          '<td>' + (f.options && f.options.length ? escapeHtml(f.options.join(', ')) : '-') + '</td>' +
+          '<td>' +
+            '<button class="btn small" onclick="editField(\'' + escapeJs(f.id) + '\')">แก้ไข</button> ' +
+            '<button class="btn small danger" onclick="deleteField(\'' + escapeJs(f.id) + '\')">ลบ</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function moveField(fieldId, direction) {
+      google.script.run
+        .withSuccessHandler(function () { loadFormFieldsList(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminMoveFormField(TOKEN, fieldId, direction);
+    }
+
+    function editField(fieldId) {
+      const f = formFields.filter(function (x) { return x.id === fieldId; })[0];
+      if (!f) return;
+      editingFieldId = fieldId;
+      document.getElementById('ffFormTitle').textContent = 'แก้ไขช่องข้อมูล: ' + f.label;
+      document.getElementById('ffLabel').value = f.label;
+      document.getElementById('ffType').value = f.type;
+      document.getElementById('ffOptionsWrap').style.display = (f.type === 'dropdown') ? 'block' : 'none';
+      document.getElementById('ffOptions').value = (f.options || []).join('\n');
+      document.getElementById('btnSaveField').textContent = 'บันทึกการแก้ไข';
+      document.getElementById('btnCancelEditField').style.display = 'inline-block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.getElementById('btnCancelEditField').addEventListener('click', resetFieldForm);
+    function resetFieldForm() {
+      editingFieldId = null;
+      document.getElementById('ffFormTitle').textContent = 'เพิ่มช่องข้อมูล';
+      document.getElementById('ffLabel').value = '';
+      document.getElementById('ffType').value = 'text';
+      document.getElementById('ffOptionsWrap').style.display = 'none';
+      document.getElementById('ffOptions').value = '';
+      document.getElementById('btnSaveField').textContent = 'เพิ่มช่องข้อมูล';
+      document.getElementById('btnCancelEditField').style.display = 'none';
+    }
+
+    document.getElementById('btnSaveField').addEventListener('click', function () {
+      const label = document.getElementById('ffLabel').value.trim();
+      const type = document.getElementById('ffType').value;
+      const options = document.getElementById('ffOptions').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!label) { showMsg('ffMsg', 'กรุณาระบุชื่อช่องข้อมูล', 'error'); return; }
+      if (type === 'dropdown' && !options.length) { showMsg('ffMsg', 'กรุณาเพิ่มรายการตัวเลือกอย่างน้อย 1 รายการ', 'error'); return; }
+
+      const btn = document.getElementById('btnSaveField');
+      btn.disabled = true;
+      const isEdit = !!editingFieldId;
+      const call = isEdit
+        ? google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminUpdateFormField(TOKEN, editingFieldId, label, type, options)
+        : google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminAddFormField(TOKEN, label, type, options);
+
+      function onSaved() {
+        btn.disabled = false;
+        showMsg('ffMsg', isEdit ? 'บันทึกการแก้ไขสำเร็จ' : 'เพิ่มช่องข้อมูลสำเร็จ', 'success');
+        resetFieldForm();
+        loadFormFieldsList();
+      }
+      function onFail(err) {
+        btn.disabled = false;
+        if (!handleAuthError(err)) showMsg('ffMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+      }
+    });
+
+    function deleteField(fieldId) {
+      if (!confirm('ยืนยันลบช่องข้อมูลนี้? (ข้อมูลที่กรอกไว้แล้วของนักเรียนจะไม่แสดงอีกต่อไป)')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadFormFieldsList(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteFormField(TOKEN, fieldId);
+    }
+
+    // ===================================================================
+    // TAB: จัดการประชาสัมพันธ์ (admin)
+    // ===================================================================
+    let editingAnnouncementId = null;
+
+    function loadAnnouncementsAdminList() {
+      const container = document.getElementById('announcementsAdminList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderAnnouncementsAdminList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getAnnouncements();
+    }
+    document.getElementById('btnRefreshAnnouncements').addEventListener('click', loadAnnouncementsAdminList);
+
+    function renderAnnouncementsAdminList(list) {
+      const container = document.getElementById('announcementsAdminList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ยังไม่มีประกาศ</div>'; return; }
+      let html = '';
+      list.forEach(function (a, idx) {
+        const upDisabled = (idx === 0) ? 'disabled' : '';
+        const downDisabled = (idx === list.length - 1) ? 'disabled' : '';
+        html += '<div class="card" style="margin-bottom:10px;">' +
+          (a.imageUrl ? '<img class="thumb" style="width:80px;height:80px;margin-bottom:8px;" src="' + a.imageUrl + '">' : '') +
+          '<p style="white-space:pre-wrap;">' + escapeHtml(a.text) + '</p>' +
+          '<div class="row-actions" style="margin-top:8px;">' +
+          '<button class="btn small secondary" ' + upDisabled + ' onclick="moveAnnouncement(\'' + escapeJs(a.id) + '\',\'up\')" title="เลื่อนขึ้น">▲</button> ' +
+          '<button class="btn small secondary" ' + downDisabled + ' onclick="moveAnnouncement(\'' + escapeJs(a.id) + '\',\'down\')" title="เลื่อนลง">▼</button> ' +
+          '<button class="btn small" onclick="editAnnouncement(\'' + escapeJs(a.id) + '\')">แก้ไข</button> ' +
+          '<button class="btn small danger" onclick="deleteAnnouncement(\'' + escapeJs(a.id) + '\')">ลบ</button>' +
+          '</div></div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function moveAnnouncement(id, direction) {
+      google.script.run
+        .withSuccessHandler(function () { loadAnnouncementsAdminList(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminMoveAnnouncement(TOKEN, id, direction);
+    }
+
+    function editAnnouncement(id) {
+      google.script.run
+        .withSuccessHandler(function (list) {
+          const a = list.filter(function (x) { return x.id === id; })[0];
+          if (!a) return;
+          editingAnnouncementId = id;
+          document.getElementById('annFormTitle').textContent = 'แก้ไขประกาศ';
+          document.getElementById('annText').value = a.text;
+          document.getElementById('btnSaveAnnouncement').textContent = 'บันทึกการแก้ไข';
+          document.getElementById('btnCancelEditAnnouncement').style.display = 'inline-block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .getAnnouncements();
+    }
+
+    document.getElementById('btnCancelEditAnnouncement').addEventListener('click', resetAnnouncementForm);
+    function resetAnnouncementForm() {
+      editingAnnouncementId = null;
+      document.getElementById('annFormTitle').textContent = 'เพิ่มประกาศใหม่';
+      document.getElementById('annText').value = '';
+      document.getElementById('annImage').value = '';
+      document.getElementById('btnSaveAnnouncement').textContent = 'เพิ่มประกาศ';
+      document.getElementById('btnCancelEditAnnouncement').style.display = 'none';
+    }
+
+    document.getElementById('btnSaveAnnouncement').addEventListener('click', function () {
+      const text = document.getElementById('annText').value.trim();
+      if (!text) { showMsg('annMsg', 'กรุณากรอกข้อความประกาศ', 'error'); return; }
+      const btn = document.getElementById('btnSaveAnnouncement');
+      btn.disabled = true;
+
+      function onSaved() {
+        btn.disabled = false;
+        showMsg('annMsg', editingAnnouncementId ? 'บันทึกการแก้ไขสำเร็จ' : 'เพิ่มประกาศสำเร็จ', 'success');
+        resetAnnouncementForm();
+        loadAnnouncementsAdminList();
+        loadPublicAnnouncements();
+      }
+      function onFail(err) {
+        btn.disabled = false;
+        if (!handleAuthError(err)) showMsg('annMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+      }
+
+      if (editingAnnouncementId) {
+        // แก้ไขได้แค่ข้อความ (เปลี่ยนรูปให้ลบประกาศเดิมแล้วเพิ่มใหม่)
+        google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
+          .adminUpdateAnnouncement(TOKEN, editingAnnouncementId, text);
+        return;
+      }
+
+      const fileInput = document.getElementById('annImage');
+      if (fileInput.files.length) {
+        const file = fileInput.files[0];
+        fileToBase64(file, function (base64) {
+          google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
+            .adminAddAnnouncement(TOKEN, text, base64, file.type, file.name);
+        });
+      } else {
+        google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
+          .adminAddAnnouncement(TOKEN, text, null, null, null);
+      }
+    });
+
+    function deleteAnnouncement(id) {
+      if (!confirm('ยืนยันลบประกาศนี้?')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadAnnouncementsAdminList(); loadPublicAnnouncements(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteAnnouncement(TOKEN, id);
+    }
+
+    // ===================================================================
+    // TAB: ลงทะเบียนนักเรียน (admin/teacher)
+    // ===================================================================
+    document.getElementById('btnAddStudent').addEventListener('click', function () {
+      const grade = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.grade : document.getElementById('addGrade').value;
+      const room = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.room : document.getElementById('addRoom').value;
+      if (!grade || !room) { showMsg('addMsg', 'กรุณาเลือก ระดับชั้น และ ห้อง ให้ครบ', 'error'); return; }
+      const info = {
+        grade: grade, room: room,
+        customValues: collectCustomFieldValues('addCustomFieldsWrap')
+      };
+      const btn = document.getElementById('btnAddStudent');
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
+          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — ไปอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ" และกำหนดเบอร์โทร/รหัสจริงได้ที่แท็บ "จัดการข้อมูล"', 'success');
+          renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
+          if (ROLE !== 'teacher') {
+            document.getElementById('addGrade').value = '';
+            document.getElementById('addRoom').value = '';
+          }
+          updateTempIdPreview();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
+          if (!handleAuthError(err)) showMsg('addMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .addStudent(TOKEN, info);
+    });
+
+    // ===================================================================
+    // TAB: จัดการรูปภาพ (admin: กรองได้ทุกชั้น/ห้อง / teacher: เห็นแค่ห้องตัวเอง)
+    // ===================================================================
+    let photoListCache = [];
+
+    function initPhotoFilters() {
+      if (ROLE === 'admin') {
+        fillSelect(document.getElementById('photoFilterGrade'), gradeOptions, 'ทั้งหมด');
+        fillSelect(document.getElementById('photoFilterRoom'), roomOptions, 'ทั้งหมด');
+      }
+    }
+    initPhotoFilters();
+
+    function loadPhotoTab() {
+      document.getElementById('photoDetailPane').innerHTML = '<div class="hint">เลือกรายชื่อทางซ้ายเพื่ออัปโหลด/เปลี่ยนรูป</div>';
+      searchPhotoList();
+    }
+
+    document.getElementById('btnPhotoListSearch').addEventListener('click', searchPhotoList);
+    function searchPhotoList() {
+      const filter = { query: document.getElementById('photoFilterQuery').value.trim() };
+      if (ROLE === 'admin') {
+        filter.grade = document.getElementById('photoFilterGrade').value;
+        filter.room = document.getElementById('photoFilterRoom').value;
+      }
+      const container = document.getElementById('photoStudentList');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderPhotoList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, filter);
+    }
+
+    function renderPhotoList(list) {
+      photoListCache = list;
+      const container = document.getElementById('photoStudentList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
+      let html = '<table><tr><th>รูป</th><th>รหัส</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td style="font-size:11px;">' + bothCodesFor(s) + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function selectPhotoStudent(id) {
+      const s = photoListCache.filter(function (x) { return x.id === id; })[0];
+      if (!s) return;
+      const pane = document.getElementById('photoDetailPane');
+      pane.innerHTML =
+        '<h3 style="margin:0 0 10px;">' + bothCodesFor(s) + ' &nbsp; ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</h3>' +
+        '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields) + '</p>' +
+        (s.photoUrl ? '<img class="photo-preview" id="photoDetailPreview" src="' + s.photoUrl + '">' : '<div class="photo-preview" id="photoDetailPreview"></div>') +
+        '<p class="hint">ชื่อไฟล์ที่ใช้อยู่ตอนนี้: ' + escapeHtml(s.photoFile || '(ยังไม่มีรูป)') + '</p>' +
+        '<p class="hint">สถานะ: ' + statusBadge(s) + '</p>' +
+        '<input type="file" id="photoDetailFile" accept="image/*">' +
+        '<br><br><button class="btn" id="btnPhotoDetailUpload">อัปโหลด/เปลี่ยนรูป</button>' +
+        '<div id="photoDetailMsg"></div>';
+
+      document.getElementById('btnPhotoDetailUpload').addEventListener('click', function () {
+        const fileInput = document.getElementById('photoDetailFile');
+        if (!fileInput.files.length) { showMsg('photoDetailMsg', 'กรุณาเลือกไฟล์รูปก่อน', 'error'); return; }
+        const file = fileInput.files[0];
+        const btn = document.getElementById('btnPhotoDetailUpload');
+        btn.disabled = true; btn.textContent = 'กำลังอัปโหลด...';
+        fileToBase64(file, function (base64) {
+          google.script.run
+            .withSuccessHandler(function (res) {
+              btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
+              showMsg('photoDetailMsg', 'อัปโหลดสำเร็จ (รอเผยแพร่) ชื่อไฟล์: ' + res.fileName, 'success');
+              document.getElementById('photoDetailPreview').outerHTML = '<img class="photo-preview" id="photoDetailPreview" src="' + res.photoUrl + '">';
+              searchPhotoList();
+            })
+            .withFailureHandler(function (err) {
+              btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
+              if (!handleAuthError(err)) showMsg('photoDetailMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+            })
+            .uploadPhotoForStudent(TOKEN, id, base64, file.type, file.name);
+        });
+      });
+    }
+
+    // ===================================================================
+    // TAB: จัดการข้อมูล > ค้นหา/แก้ไขข้อมูล (admin/teacher)
+    // ===================================================================
+    document.getElementById('btnSearch').addEventListener('click', function () {
+      const filter = {
+        query: document.getElementById('searchQuery').value.trim(),
+        grade: document.getElementById('searchGrade').value,
+        room: document.getElementById('searchRoom').value
+      };
+      const container = document.getElementById('searchResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderSearchResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, filter);
+    });
+
+    let lastSearchResults = [];
+    function renderSearchResults(list) {
+      lastSearchResults = list;
+      const container = document.getElementById('searchResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
+      const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
+      let html = '<table><tr><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
+          '<td>' + statusBadge(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td>' +
+            '<button class="btn small" onclick="openEdit(\'' + escapeJs(s.id) + '\')">แก้ไข</button> ' +
+            '<button class="btn small danger" onclick="deleteRow(\'' + escapeJs(s.id) + '\', this)">' + delLabel + '</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function deleteRow(id, btnEl) {
+      const isAdmin = (ROLE === 'admin');
+      const confirmMsg = isAdmin ? 'ยืนยันลบนักเรียนรายนี้? (รูปจะถูกย้ายลงถังขยะใน Drive)' : 'ยืนยันส่งคำขอลบนักเรียนรายนี้ให้แอดมินอนุมัติ?';
+      if (!confirm(confirmMsg)) return;
+      const fn = isAdmin ? 'deleteStudent' : 'teacherRequestDelete';
+      google.script.run
+        .withSuccessHandler(function () {
+          if (isAdmin) { document.getElementById('btnSearch').click(); }
+          else { btnEl.textContent = 'ส่งคำขอแล้ว ✓'; btnEl.disabled = true; }
+        })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        [fn](TOKEN, id);
+    }
+
+    function openEdit(id) {
+      const s = lastSearchResults.filter(function (x) { return x.id === id; })[0];
+      if (!s) return;
+      currentEditId = id;
+      document.getElementById('editStudentLabel').textContent = s.activeCode;
+      document.getElementById('editPhone').value = s.phone;
+      document.getElementById('editRealId').value = s.realId;
+      if (ROLE === 'admin') {
+        document.getElementById('editTempIdWrap').style.display = 'block';
+        document.getElementById('editTempId').value = s.tempId;
+      } else {
+        document.getElementById('editTempIdWrap').style.display = 'none';
+      }
+      renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields);
+      renderCustomFileFields('editCustomFileFieldsWrap', formFields, id, s.customFields);
+      document.getElementById('editFormCard').classList.add('active');
+    }
+
+    document.getElementById('btnSaveRealId').addEventListener('click', function () {
+      const val = document.getElementById('editRealId').value.trim();
+      if (!currentEditId) return;
+      if (!confirm(val ? ('ยืนยันบันทึกรหัสจริงเป็น "' + val + '" ?') : 'ยืนยันลบรหัสจริง (กลับไปใช้รหัสชั่วคราว)?')) return;
+      const btn = document.getElementById('btnSaveRealId');
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false;
+          showMsg('editMsg', 'บันทึกรหัสจริงสำเร็จ', 'success');
+          document.getElementById('btnSearch').click();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .confirmRealId(TOKEN, currentEditId, val);
+    });
+
+    function closeEditModal() {
+      document.getElementById('editFormCard').classList.remove('active');
+      currentEditId = null;
+    }
+    document.getElementById('btnCloseEditModal').addEventListener('click', closeEditModal);
+    document.getElementById('editFormCard').addEventListener('click', function (e) {
+      if (e.target === this) closeEditModal();
+    });
+
+    document.getElementById('btnSaveTempId').addEventListener('click', function () {
+      const newTempId = document.getElementById('editTempId').value.trim();
+      if (!newTempId) { showMsg('editMsg', 'กรุณากรอกรหัสชั่วคราว', 'error'); return; }
+      if (!currentEditId) return;
+      const btn = document.getElementById('btnSaveTempId');
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false;
+          showMsg('editMsg', 'บันทึกรหัสชั่วคราวสำเร็จ', 'success');
+          document.getElementById('btnSearch').click();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .adminSetTempId(TOKEN, currentEditId, newTempId);
+    });
+
+    document.getElementById('btnSaveEdit').addEventListener('click', function () {
+      if (!currentEditId) return;
+      const info = {
+        phone: document.getElementById('editPhone').value.trim(),
+        customValues: collectCustomFieldValues('editCustomFieldsWrap')
+      };
+      const btn = document.getElementById('btnSaveEdit');
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
+          document.getElementById('btnSearch').click();
+          closeEditModal();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
+          if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .updateStudentInfo(TOKEN, currentEditId, info);
+    });
+
+    // ===================================================================
+    // TAB: จัดการข้อมูล > ยืนยันรหัสจริง (admin/teacher)
+    // ===================================================================
+    function loadConfirmList() {
+      const filter = {
+        grade: document.getElementById('confirmFilterGrade').value,
+        room: document.getElementById('confirmFilterRoom').value
+      };
+      const container = document.getElementById('confirmList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderConfirmList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, filter);
+    }
+    document.getElementById('btnRefreshConfirm').addEventListener('click', loadConfirmList);
+
+    function renderConfirmList(list) {
+      const container = document.getElementById('confirmList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
+      let html = '<table><tr><th>รูป</th><th>รหัสปัจจุบัน</th><th>ข้อมูล</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>รหัสจริง (ลบให้ว่างเพื่อยกเลิก)</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
+          '<td>' + statusBadge(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td class="inline-form"><input type="text" class="realIdInput" data-id="' + s.id + '" value="' + escapeHtml(s.realId) + '" placeholder="(ไม่มีรหัสจริง)">' +
+          '<button class="btn small" onclick="confirmReal(\'' + escapeJs(s.id) + '\', this)">บันทึก</button></td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function confirmReal(id, btnEl) {
+      const input = document.querySelector('.realIdInput[data-id="' + id + '"]');
+      const val = input.value.trim();
+      if (!confirm(val ? ('ยืนยันบันทึกรหัสจริงเป็น "' + val + '" ?') : 'ยืนยันลบรหัสจริง (กลับไปใช้รหัสชั่วคราว)?')) return;
+      btnEl.disabled = true; btnEl.textContent = '...';
+      google.script.run
+        .withSuccessHandler(function () { loadConfirmList(); })
+        .withFailureHandler(function (err) {
+          btnEl.disabled = false; btnEl.textContent = 'บันทึก';
+          if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+        })
+        .confirmRealId(TOKEN, id, val);
+    }
+
+    // ===================================================================
+    // TAB: จัดการข้อมูล > ย้ายห้อง (admin: ทันที / teacher: แจ้งคำขอ)
+    // ===================================================================
+    document.getElementById('btnMoveSearch').addEventListener('click', function () {
+      const filter = {
+        query: document.getElementById('moveSearch').value.trim(),
+        grade: document.getElementById('moveFilterGrade').value,
+        room: document.getElementById('moveFilterRoom').value
+      };
+      const container = document.getElementById('moveResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderMoveResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listStudents(TOKEN, filter);
+    });
+
+    function renderMoveResults(list) {
+      const container = document.getElementById('moveResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
+      let html = '<table><tr><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\', \'' +
+            escapeJs(s.activeCode) + '\', \'' +
+            escapeJs(s.grade) + '\', \'' + escapeJs(s.room) + '\')">เลือกย้าย</button></td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function selectMoveStudent(id, label, grade, room) {
+      currentMoveStudent = { id: id, grade: grade, room: room };
+      document.getElementById('moveStudentLabel').textContent = label;
+      document.getElementById('moveCurrentClass').textContent = grade + ' / ห้อง ' + room;
+      document.getElementById('moveFormTitle').innerHTML =
+        (ROLE === 'admin' ? 'ย้ายห้องให้ ' : 'แจ้งย้ายห้องให้ ') + '<span id="moveStudentLabel2">' + escapeHtml(label) + '</span>';
+      document.getElementById('btnConfirmMove').textContent = (ROLE === 'admin') ? 'ยืนยันการย้ายห้อง' : 'แจ้งย้ายห้อง (รออนุมัติจากแอดมิน)';
+      document.getElementById('moveFormCard').style.display = 'block';
+      document.getElementById('moveFormCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btnConfirmMove').addEventListener('click', function () {
+      const newGrade = document.getElementById('moveNewGrade').value;
+      const newRoom = document.getElementById('moveNewRoom').value;
+      if (!newGrade || !newRoom) { showMsg('moveMsg', 'กรุณาเลือกระดับชั้นและห้องใหม่', 'error'); return; }
+      if (!currentMoveStudent) return;
+      const btn = document.getElementById('btnConfirmMove');
+      const originalLabel = btn.textContent;
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+
+      if (ROLE === 'admin') {
+        const newDate = document.getElementById('moveNewDate').value;
+        google.script.run
+          .withSuccessHandler(function () {
+            btn.disabled = false; btn.textContent = originalLabel;
+            showMsg('moveMsg', 'ย้ายห้องสำเร็จ!', 'success');
+            document.getElementById('moveCurrentClass').textContent = newGrade + ' / ห้อง ' + newRoom;
+            document.getElementById('btnMoveSearch').click();
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false; btn.textContent = originalLabel;
+            if (!handleAuthError(err)) showMsg('moveMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          })
+          .moveStudentClass(TOKEN, currentMoveStudent.id, newGrade, newRoom, newDate);
+      } else {
+        google.script.run
+          .withSuccessHandler(function () {
+            btn.disabled = false; btn.textContent = originalLabel;
+            showMsg('moveMsg', 'ส่งคำขอย้ายห้องแล้ว รอแอดมินอนุมัติ', 'success');
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false; btn.textContent = originalLabel;
+            if (!handleAuthError(err)) showMsg('moveMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          })
+          .teacherRequestMove(TOKEN, currentMoveStudent.id, newGrade, newRoom);
+      }
+    });
+
+    // ===================================================================
+    // TAB: จัดการข้อความ (admin) — อนุมัติ/ปฏิเสธ พร้อมข้อความตอบกลับ
+    // ===================================================================
+    function loadRequestsList() {
+      const container = document.getElementById('requestsList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderRequestsList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .adminListRequests(TOKEN);
+    }
+    document.getElementById('btnRefreshRequests').addEventListener('click', loadRequestsList);
+
+    function studentNowCell(r) {
+      if (!r.studentNow) return '<span class="hint">(ถูกลบไปแล้ว — บันทึกไว้ตอนขอ: ' + escapeHtml(r.studentName) + ')</span>';
+      const codes = bothCodesFor({ realId: r.studentNow.realId, tempId: r.studentNow.tempId });
+      return codes + '<br><span style="font-size:11px;">' + formatCustomFieldsSummary(r.studentNow.customFields) + '</span>';
+    }
+
+    function renderRequestsList(list) {
+      const container = document.getElementById('requestsList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>'; return; }
+      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>วันที่ใหม่ (ถ้าย้าย)</th><th>ข้อความตอบกลับ</th><th>ดำเนินการ</th></tr>';
+      list.forEach(function (r) {
+        const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
+        html += '<tr>' +
+          '<td>' + escapeHtml(r.type) + '</td>' +
+          '<td style="font-size:12px;">' + studentNowCell(r) + '</td>' +
+          '<td>' + escapeHtml(detailTxt) + '</td>' +
+          '<td>' + escapeHtml(r.requestedBy) + '</td>' +
+          '<td>' + escapeHtml(r.requestedAt) + '</td>' +
+          '<td>' + (r.type === 'ย้ายห้อง' ? '<input type="date" class="reqDate" data-row="' + r.requestRow + '" style="width:140px">' : '-') + '</td>' +
+          '<td><input type="text" class="reqReply" data-row="' + r.requestRow + '" placeholder="ข้อความถึงครู (ไม่บังคับ)" style="width:160px"></td>' +
+          '<td>' +
+            '<button class="btn small success" onclick="handleRequest(' + r.requestRow + ', \'approve\', this)">อนุมัติ</button> ' +
+            '<button class="btn small danger" onclick="handleRequest(' + r.requestRow + ', \'reject\', this)">ปฏิเสธ</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    function handleRequest(requestRow, decision, btnEl) {
+      const dateInput = document.querySelector('.reqDate[data-row="' + requestRow + '"]');
+      const replyInput = document.querySelector('.reqReply[data-row="' + requestRow + '"]');
+      const photoDate = dateInput ? dateInput.value : '';
+      const replyMessage = replyInput ? replyInput.value.trim() : '';
+      btnEl.closest('td').querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+      google.script.run
+        .withSuccessHandler(function () {
+          showMsg('requestsMsg', decision === 'approve' ? 'อนุมัติคำขอแล้ว' : 'ปฏิเสธคำขอแล้ว', 'success');
+          loadRequestsList();
+        })
+        .withFailureHandler(function (err) {
+          if (!handleAuthError(err)) showMsg('requestsMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          loadRequestsList();
+        })
+        .adminHandleRequest(TOKEN, requestRow, decision, photoDate, replyMessage);
+    }
+
+    // ===================================================================
+    // TAB: คำขอของฉัน (teacher)
+    // ===================================================================
+    function loadMyRequestsList() {
+      const container = document.getElementById('myRequestsList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderMyRequestsList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getMyRequests(TOKEN);
+    }
+    document.getElementById('btnRefreshMyRequests').addEventListener('click', loadMyRequestsList);
+
+    function renderMyRequestsList(list) {
+      const container = document.getElementById('myRequestsList');
+      if (!list.length) { container.innerHTML = '<div class="empty">คุณยังไม่ได้ส่งคำขอใดๆ</div>'; return; }
+      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>วันที่ขอ</th><th>สถานะ</th><th>ข้อความตอบกลับจากแอดมิน</th></tr>';
+      list.forEach(function (r) {
+        const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
+        html += '<tr>' +
+          '<td>' + escapeHtml(r.type) + '</td>' +
+          '<td style="font-size:12px;">' + studentNowCell(r) + '</td>' +
+          '<td>' + escapeHtml(detailTxt) + '</td>' +
+          '<td>' + escapeHtml(r.requestedAt) + '</td>' +
+          '<td>' + requestStatusBadge(r.status) + '</td>' +
+          '<td>' + (r.replyMessage ? escapeHtml(r.replyMessage) : '<span class="hint">-</span>') + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+    // ===================================================================
+    // TAB: การจัดส่งข้อมูล (admin)
+    // ===================================================================
+    function loadPendingList() {
+      const container = document.getElementById('pendingList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderPendingList)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .listPendingPhotos(TOKEN);
+    }
+    document.getElementById('btnRefreshPending').addEventListener('click', loadPendingList);
+
+    function renderPendingList(list) {
+      const container = document.getElementById('pendingList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีรูปที่รอเผยแพร่</div>'; return; }
+      let html = '<table><tr><th><input type="checkbox" id="pendingSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td><input type="checkbox" class="pendingChk" value="' + s.id + '"></td>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      document.getElementById('pendingSelectAll').addEventListener('change', function (e) {
+        document.querySelectorAll('.pendingChk').forEach(function (c) { c.checked = e.target.checked; });
+      });
+    }
+
+    document.getElementById('btnPublishSelected').addEventListener('click', function () {
+      const ids = Array.prototype.map.call(document.querySelectorAll('.pendingChk:checked'), function (c) { return c.value; });
+      if (!ids.length) { showMsg('pendingMsg', 'กรุณาเลือกรายการที่ต้องการเผยแพร่อย่างน้อย 1 รายการ', 'error'); return; }
+      const date = document.getElementById('publishDate').value;
+      const btn = document.getElementById('btnPublishSelected');
+      btn.disabled = true; btn.textContent = 'กำลังเผยแพร่...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
+          showMsg('pendingMsg', 'เผยแพร่สำเร็จ ' + res.count + ' รายการ', 'success');
+          loadPendingList();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
+          if (!handleAuthError(err)) showMsg('pendingMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .publishPhotos(TOKEN, ids, date);
+    });
+
+    // ===================================================================
+    // TAB: ข้อมูลของฉัน (student)
+    // ===================================================================
+    function loadMyInfo() {
+      const box = document.getElementById('studentInfoBox');
+      box.innerHTML = 'กำลังโหลด...';
+      google.script.run
+        .withSuccessHandler(renderMyInfo)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .getMyInfo(TOKEN);
+    }
+
+    function renderMyInfo(s) {
+      const box = document.getElementById('studentInfoBox');
+      box.innerHTML =
+        (s.photoUrl ? '<img class="photo-preview" src="' + s.photoUrl + '">' : '<div class="photo-preview"></div>') +
+        '<p>รหัสนักเรียน: ' + bothCodesFor(s) + ' &nbsp; สถานะรูป: ' + statusBadge(s) + '</p>' +
+        '<p>ระดับชั้น/ห้อง: ' + escapeHtml(s.grade + ' / ' + s.room) + '</p>' +
+        '<div class="hint">การเปลี่ยนรูปต้องให้ครูที่ปรึกษาหรือแอดมินดำเนินการให้</div>' +
+        '<div class="divider"></div>' +
+        '<label>เบอร์โทร (ใช้เป็นรหัสผ่านล็อกอินของฉันด้วย)</label>' +
+        '<input id="myPhone" value="' + escapeHtml(s.phone) + '">' +
+        '<br><br><button class="btn" id="btnSaveMyPhone">บันทึกเบอร์โทร</button>';
+
+      document.getElementById('btnSaveMyPhone').addEventListener('click', function () {
+        const phone = document.getElementById('myPhone').value.trim();
+        google.script.run
+          .withSuccessHandler(function () { showMsg('studentMsg', 'บันทึกเบอร์โทรสำเร็จ', 'success'); })
+          .withFailureHandler(function (err) { if (!handleAuthError(err)) showMsg('studentMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+          .updateStudentInfo(TOKEN, MY_ID, { phone: phone });
+      });
+    }
+
+    // ===================================================================
+    // TAB: ดาวน์โหลดข้อมูล (company)
+    // ===================================================================
+    function getCoFilters() {
+      return { date: document.getElementById('coDate').value, grade: document.getElementById('coGrade').value, room: document.getElementById('coRoom').value };
+    }
+
+    document.getElementById('btnCoSearch').addEventListener('click', function () {
+      const container = document.getElementById('coResults');
+      container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
+      google.script.run
+        .withSuccessHandler(renderCoResults)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .companySearchStudents(TOKEN, getCoFilters());
+    });
+
+    function renderCoResults(list) {
+      const container = document.getElementById('coResults');
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการตามเงื่อนไข</div>'; return; }
+      let html = '<table><tr><th><input type="checkbox" id="coSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ชั้น/ห้อง</th><th>วันที่</th></tr>';
+      list.forEach(function (s) {
+        html += '<tr>' +
+          '<td><input type="checkbox" class="coChk" value="' + s.id + '"></td>' +
+          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td>' + escapeHtml(s.photoDate || '-') + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      document.getElementById('coSelectAll').addEventListener('change', function (e) {
+        document.querySelectorAll('.coChk').forEach(function (c) { c.checked = e.target.checked; });
+      });
+    }
+
+    document.getElementById('btnCoDownload').addEventListener('click', function () {
+      const ids = Array.prototype.map.call(document.querySelectorAll('.coChk:checked'), function (c) { return c.value; });
+      if (!ids.length) { showMsg('coMsg', 'กรุณาติ๊กเลือกรูปที่ต้องการดาวน์โหลดอย่างน้อย 1 รายการ', 'error'); return; }
+      const btn = document.getElementById('btnCoDownload');
+      btn.disabled = true; btn.textContent = 'กำลังเตรียมไฟล์...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'ดาวน์โหลดรูปที่เลือก (ZIP + ข้อมูล CSV)';
+          downloadBase64File(res.base64, res.filename, 'application/zip');
+          showMsg('coMsg', 'ดาวน์โหลดไฟล์ ' + res.filename + ' แล้ว (' + ids.length + ' รายการ)', 'success');
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'ดาวน์โหลดรูปที่เลือก (ZIP + ข้อมูล CSV)';
+          if (!handleAuthError(err)) showMsg('coMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .companyDownloadSelected(TOKEN, ids);
+    });
+
+    function downloadBase64File(base64, filename, mime) {
+      const byteChars = atob(base64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mime || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ===================================================================
+    // TAB: บัญชีของฉัน (admin/teacher/company)
+    // ===================================================================
+    document.getElementById('btnChangePw').addEventListener('click', function () {
+      const oldPw = document.getElementById('pwOld').value;
+      const newPw = document.getElementById('pwNew').value;
+      if (!oldPw || !newPw) { showMsg('pwMsg', 'กรุณากรอกให้ครบ', 'error'); return; }
+      const btn = document.getElementById('btnChangePw');
+      btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'บันทึกรหัสผ่านใหม่';
+          showMsg('pwMsg', 'เปลี่ยนรหัสผ่านสำเร็จ', 'success');
+          document.getElementById('pwOld').value = ''; document.getElementById('pwNew').value = '';
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'บันทึกรหัสผ่านใหม่';
+          if (!handleAuthError(err)) showMsg('pwMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .changeOwnPassword(TOKEN, oldPw, newPw);
+    });
+
+    function loadAccountTab() {
+      if (ROLE !== 'admin') return;
+      const box = document.getElementById('adminUsersList');
+      box.innerHTML = 'กำลังโหลด...';
+      google.script.run
+        .withSuccessHandler(renderAdminUsers)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .adminListUsers(TOKEN);
+    }
+
+    function renderAdminUsers(list) {
+      const box = document.getElementById('adminUsersList');
+      let html = '<table><tr><th>บทบาท</th><th>Username</th><th>Username ใหม่</th><th>รหัสผ่านใหม่</th><th></th></tr>';
+      list.forEach(function (u) {
+        html += '<tr>' +
+          '<td><span class="badge role">' + escapeHtml(ROLE_THAI[u.role] || u.role) + '</span></td>' +
+          '<td>' + escapeHtml(u.username) + '</td>' +
+          '<td><input type="text" class="auNewUser" data-username="' + escapeHtml(u.username) + '" placeholder="(ไม่เปลี่ยนเว้นว่าง)"></td>' +
+          '<td><input type="text" class="auNewPass" data-username="' + escapeHtml(u.username) + '" placeholder="(ไม่เปลี่ยนเว้นว่าง)"></td>' +
+          '<td>' +
+            '<button class="btn small" onclick="saveCredential(\'' + escapeJs(u.username) + '\', this)">บันทึก</button> ' +
+            '<button class="btn small danger" onclick="deleteUser(\'' + escapeJs(u.username) + '\')">ลบบัญชี</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      box.innerHTML = html;
+    }
+
+    function saveCredential(username, btnEl) {
+      const newUser = document.querySelector('.auNewUser[data-username="' + username + '"]').value.trim();
+      const newPass = document.querySelector('.auNewPass[data-username="' + username + '"]').value.trim();
+      if (!newUser && !newPass) { alert('กรุณากรอก username หรือ password ใหม่อย่างน้อย 1 อย่าง'); return; }
+      btnEl.disabled = true; btnEl.textContent = '...';
+      google.script.run
+        .withSuccessHandler(function () { showMsg('adminUsersMsg', 'บันทึกสำเร็จ', 'success'); loadAccountTab(); })
+        .withFailureHandler(function (err) {
+          btnEl.disabled = false; btnEl.textContent = 'บันทึก';
+          if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
+        })
+        .adminUpdateCredential(TOKEN, username, newUser, newPass);
+    }
+
+    function deleteUser(username) {
+      if (!confirm('ยืนยันลบบัญชี "' + username + '"?')) return;
+      google.script.run
+        .withSuccessHandler(function () { showMsg('adminUsersMsg', 'ลบบัญชีแล้ว', 'success'); loadAccountTab(); })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteUser(TOKEN, username);
+    }
+
+    document.getElementById('btnAddUser').addEventListener('click', function () {
+      const role = document.getElementById('newUserRole').value;
+      const username = document.getElementById('newUserUsername').value.trim();
+      const password = document.getElementById('newUserPassword').value.trim();
+      const displayName = document.getElementById('newUserDisplayName').value.trim();
+      if (!username || !password) { showMsg('adminUsersMsg', 'กรุณากรอก username และ password', 'error'); return; }
+      const btn = document.getElementById('btnAddUser');
+      btn.disabled = true; btn.textContent = 'กำลังเพิ่ม...';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false; btn.textContent = 'เพิ่มบัญชี';
+          showMsg('adminUsersMsg', 'เพิ่มบัญชีสำเร็จ', 'success');
+          ['newUserUsername', 'newUserPassword', 'newUserDisplayName'].forEach(function (id) { document.getElementById(id).value = ''; });
+          loadAccountTab();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'เพิ่มบัญชี';
+          if (!handleAuthError(err)) showMsg('adminUsersMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .adminAddUser(TOKEN, role, username, password, displayName);
+    });
+
+    // ---------------------------------------------------------------
+    // สร้างบัญชีครูที่ปรึกษาแบบกลุ่ม
+    // ---------------------------------------------------------------
+    function fillBulkGradeOptions() {
+      const level = document.getElementById('bulkLevel').value;
+      const max = (level === 'A') ? 3 : 6;
+      const select = document.getElementById('bulkGradeDigit');
+      select.innerHTML = '';
+      for (let i = 1; i <= max; i++) {
+        const o = document.createElement('option');
+        o.value = i; o.textContent = i;
+        select.appendChild(o);
+      }
+    }
+    document.getElementById('bulkLevel').addEventListener('change', fillBulkGradeOptions);
+    fillBulkGradeOptions();
+
+    document.getElementById('btnBulkCreateTeachers').addEventListener('click', function () {
+      const level = document.getElementById('bulkLevel').value;
+      const gradeDigit = document.getElementById('bulkGradeDigit').value;
+      const roomCount = document.getElementById('bulkRoomCount').value;
+      const password = document.getElementById('bulkPassword').value.trim();
+      if (!password) { showMsg('bulkTeacherMsg', 'กรุณากรอกรหัสผ่าน', 'error'); return; }
+      const btn = document.getElementById('btnBulkCreateTeachers');
+      btn.disabled = true; btn.textContent = 'กำลังสร้าง...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = 'สร้างบัญชี';
+          let msg = 'สร้างสำเร็จ ' + res.created.length + ' บัญชี';
+          if (res.skipped.length) msg += ' (ข้าม ' + res.skipped.length + ' บัญชีที่มีอยู่แล้ว: ' + res.skipped.join(', ') + ')';
+          showMsg('bulkTeacherMsg', msg, 'success');
+
+          const resultBox = document.getElementById('bulkResultList');
+          if (res.created.length) {
+            let html = '<table><tr><th>Username</th><th>Password</th></tr>';
+            res.created.forEach(function (u) {
+              html += '<tr><td><b>' + escapeHtml(u.username) + '</b></td><td>' + escapeHtml(u.password) + '</td></tr>';
+            });
+            html += '</table>';
+            resultBox.innerHTML = html;
+          }
+          loadAccountTab();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = 'สร้างบัญชี';
+          if (!handleAuthError(err)) showMsg('bulkTeacherMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+        })
+        .adminBulkCreateTeachers(TOKEN, level, gradeDigit, roomCount, password);
+    });
+  </script>
+</body>
+</html>
