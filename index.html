@@ -173,29 +173,43 @@
   <div class="modal-overlay" id="publicRegisterModal">
     <div class="modal-box" style="max-width:560px;">
       <button class="modal-close" id="btnClosePublicRegister" type="button" title="ปิด">✕</button>
-      <h2>ลงทะเบียนนักเรียน</h2>
-      <div id="pubRegMsg"></div>
 
-      <div class="card" style="background:#f8fafc;">
-        <label>ตรวจสอบว่าลงทะเบียนแล้วหรือยัง (ค้นด้วยชื่อ/นามสกุล/เบอร์โทร)</label>
-        <div class="inline-form">
-          <input id="pubRegSearchQuery" placeholder="พิมพ์เพื่อค้นหา...">
-          <button class="btn small secondary" id="btnPubRegSearch" type="button">ค้นหา</button>
+      <div id="pubRegFormView">
+        <h2>ลงทะเบียนนักเรียน</h2>
+        <div id="pubRegMsg"></div>
+
+        <div class="card" style="background:#f8fafc;">
+          <label>ตรวจสอบว่าลงทะเบียนแล้วหรือยัง (ค้นด้วยชื่อ/นามสกุล/เบอร์โทร)</label>
+          <div class="inline-form">
+            <input id="pubRegSearchQuery" placeholder="พิมพ์เพื่อค้นหา...">
+            <button class="btn small secondary" id="btnPubRegSearch" type="button">ค้นหา</button>
+          </div>
+          <div id="pubRegSearchResults" style="margin-top:10px;"></div>
         </div>
-        <div id="pubRegSearchResults" style="margin-top:10px;"></div>
+
+        <div class="divider"></div>
+        <div class="grid">
+          <div><label>ระดับชั้น *</label><select id="pubRegGrade"></select></div>
+          <div><label>ห้อง *</label><select id="pubRegRoom"></select></div>
+          <div><label>เบอร์โทรนักเรียน *</label><input id="pubRegPhone"></div>
+        </div>
+        <div class="hint">รหัสชั่วคราวจะสร้างให้อัตโนมัติจากระดับชั้น+ห้อง ทุกช่องด้านล่างนี้ต้องกรอกให้ครบจึงบันทึกได้</div>
+        <div class="divider"></div>
+        <div id="pubRegCustomFieldsWrap"><div class="hint">กำลังโหลดแบบฟอร์ม...</div></div>
+        <br>
+        <button class="btn full" id="btnSubmitPublicRegister">บันทึกลงทะเบียน</button>
       </div>
 
-      <div class="divider"></div>
-      <div class="grid">
-        <div><label>ระดับชั้น *</label><select id="pubRegGrade"></select></div>
-        <div><label>ห้อง *</label><select id="pubRegRoom"></select></div>
-        <div><label>เบอร์โทรนักเรียน *</label><input id="pubRegPhone"></div>
+      <div id="pubRegSuccessView" style="display:none;">
+        <h2>✅ ลงทะเบียนสำเร็จ!</h2>
+        <div class="msg success" style="font-size:15px;line-height:1.8;">
+          <p style="margin:0;"><b>ชื่อผู้ใช้ (Username):</b> <span id="pubRegResultUser" style="font-size:18px;font-weight:700;"></span></p>
+          <p style="margin:8px 0 0;"><b>รหัสผ่าน (Password):</b> <span id="pubRegResultPass" style="font-size:18px;font-weight:700;"></span></p>
+        </div>
+        <div class="msg error" style="font-weight:700;margin-top:12px;">⚠️ กรุณาจดหรือแคปหน้าจอเก็บไว้ — ระบบจะไม่แสดงข้อมูลนี้ให้ดูอีกหลังจากนี้</div>
+        <br>
+        <button class="btn full" id="btnAckPublicRegister">รับทราบแล้ว (ไปหน้าเข้าสู่ระบบ)</button>
       </div>
-      <div class="hint">รหัสชั่วคราวจะสร้างให้อัตโนมัติจากระดับชั้น+ห้อง ทุกช่องด้านล่างนี้ต้องกรอกให้ครบจึงบันทึกได้</div>
-      <div class="divider"></div>
-      <div id="pubRegCustomFieldsWrap"><div class="hint">กำลังโหลดแบบฟอร์ม...</div></div>
-      <br>
-      <button class="btn full" id="btnSubmitPublicRegister">บันทึกลงทะเบียน</button>
     </div>
   </div>
 
@@ -2436,12 +2450,22 @@
     // ===================================================================
     let pubRegFields = [];
 
+    function isPubRegShowingSuccess() {
+      return document.getElementById('pubRegSuccessView').style.display !== 'none';
+    }
+    function resetPubRegToFormView() {
+      document.getElementById('pubRegFormView').style.display = 'block';
+      document.getElementById('pubRegSuccessView').style.display = 'none';
+    }
+
     document.getElementById('btnOpenPublicRegister').addEventListener('click', function () {
+      resetPubRegToFormView();
       document.getElementById('publicRegisterModal').classList.add('active');
       fillSelect(document.getElementById('pubRegGrade'), gradeOptions, null);
       fillSelect(document.getElementById('pubRegRoom'), roomOptions, null);
       document.getElementById('pubRegSearchResults').innerHTML = '';
       document.getElementById('pubRegSearchQuery').value = '';
+      document.getElementById('pubRegPhone').value = '';
       google.script.run
         .withSuccessHandler(function (fields) {
           pubRegFields = fields;
@@ -2451,10 +2475,22 @@
         .getPublicFormFields();
     });
     document.getElementById('btnClosePublicRegister').addEventListener('click', function () {
+      if (isPubRegShowingSuccess()) { alert('กรุณากดปุ่ม "รับทราบแล้ว" ก่อนปิดหน้านี้ เพื่อให้แน่ใจว่าได้บันทึก Username/Password ไว้แล้ว'); return; }
       document.getElementById('publicRegisterModal').classList.remove('active');
     });
     document.getElementById('publicRegisterModal').addEventListener('click', function (e) {
-      if (e.target === this) this.classList.remove('active');
+      if (e.target !== this) return;
+      if (isPubRegShowingSuccess()) return; // ห้ามปิดด้วยการคลิกพื้นหลังถ้ายังไม่กดรับทราบ
+      this.classList.remove('active');
+    });
+
+    document.getElementById('btnAckPublicRegister').addEventListener('click', function () {
+      const username = document.getElementById('pubRegResultUser').textContent;
+      document.getElementById('publicRegisterModal').classList.remove('active');
+      resetPubRegToFormView();
+      document.getElementById('loginUsername').value = username;
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginPassword').focus();
     });
 
     document.getElementById('btnPubRegSearch').addEventListener('click', function () {
@@ -2487,9 +2523,10 @@
       google.script.run
         .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'บันทึกลงทะเบียน';
-          showMsg('pubRegMsg', 'ลงทะเบียนสำเร็จ! รหัสนักเรียนของคุณคือ: ' + res.tempId + ' (เก็บไว้ใช้ login)', 'success');
-          document.getElementById('pubRegPhone').value = '';
-          renderCustomFieldInputs('pubRegCustomFieldsWrap', pubRegFields.filter(fieldIsInline), {});
+          document.getElementById('pubRegResultUser').textContent = res.tempId;
+          document.getElementById('pubRegResultPass').textContent = phone;
+          document.getElementById('pubRegFormView').style.display = 'none';
+          document.getElementById('pubRegSuccessView').style.display = 'block';
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'บันทึกลงทะเบียน';
