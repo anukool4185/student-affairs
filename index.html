@@ -1206,15 +1206,22 @@
         .listStudents(TOKEN, filter);
     }
 
+    function guessNameFor(customFields) {
+      if (!customFields || !formFields.length) return '';
+      const nameField = formFields.filter(function (f) { return !fieldIsFile(f) && f.label.indexOf('ชื่อ') !== -1; })[0];
+      return (nameField && customFields[nameField.id]) ? customFields[nameField.id] : '';
+    }
+
     function renderPhotoList(list) {
       photoListCache = list;
       const container = document.getElementById('photoStudentList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table><tr><th>รูป</th><th>รหัส</th></tr>';
+      let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
       list.forEach(function (s) {
+        const name = guessNameFor(s.customFields);
         html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td style="font-size:11px;">' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:11px;">' + bothCodesFor(s) + (name ? '<br>' + escapeHtml(name) : '') + '</td>' +
           '</tr>';
       });
       html += '</table>';
@@ -1228,12 +1235,16 @@
       pane.innerHTML =
         '<h3 style="margin:0 0 10px;">' + bothCodesFor(s) + ' &nbsp; ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</h3>' +
         '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields) + '</p>' +
+        '<button class="btn small secondary" id="btnEditFromPhoto">📝 แก้ไขข้อมูล</button>' +
+        '<div class="divider"></div>' +
         (s.photoUrl ? '<img class="photo-preview" id="photoDetailPreview" src="' + s.photoUrl + '">' : '<div class="photo-preview" id="photoDetailPreview"></div>') +
         '<p class="hint">ชื่อไฟล์ที่ใช้อยู่ตอนนี้: ' + escapeHtml(s.photoFile || '(ยังไม่มีรูป)') + '</p>' +
         '<p class="hint">สถานะ: ' + statusBadge(s) + '</p>' +
         '<input type="file" id="photoDetailFile" accept="image/*">' +
         '<br><br><button class="btn" id="btnPhotoDetailUpload">อัปโหลด/เปลี่ยนรูป</button>' +
         '<div id="photoDetailMsg"></div>';
+
+      document.getElementById('btnEditFromPhoto').addEventListener('click', function () { openEditWithData(s); });
 
       document.getElementById('btnPhotoDetailUpload').addEventListener('click', function () {
         const fileInput = document.getElementById('photoDetailFile');
@@ -1306,16 +1317,22 @@
       const fn = isAdmin ? 'deleteStudent' : 'teacherRequestDelete';
       google.script.run
         .withSuccessHandler(function () {
-          if (isAdmin) { document.getElementById('btnSearch').click(); }
+          if (isAdmin) { refreshAllStudentLists(); }
           else { btnEl.textContent = 'ส่งคำขอแล้ว ✓'; btnEl.disabled = true; }
         })
         .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
         [fn](TOKEN, id);
     }
 
-    function openEdit(id) {
-      const s = lastSearchResults.filter(function (x) { return x.id === id; })[0];
-      if (!s) return;
+    function refreshAllStudentLists() {
+      document.getElementById('btnSearch').click();
+      if (photoListCache.length || document.getElementById('panel-photos').classList.contains('active')) {
+        searchPhotoList();
+      }
+    }
+
+    function openEditWithData(s) {
+      const id = s.id;
       currentEditId = id;
       document.getElementById('editStudentLabel').textContent = s.activeCode;
       document.getElementById('editPhone').value = s.phone;
@@ -1335,6 +1352,12 @@
       document.getElementById('editFormCard').classList.add('active');
     }
 
+    function openEdit(id) {
+      const s = lastSearchResults.filter(function (x) { return x.id === id; })[0];
+      if (!s) return;
+      openEditWithData(s);
+    }
+
     document.getElementById('btnSaveEditPhoto').addEventListener('click', function () {
       const fileInput = document.getElementById('editPhotoFile');
       if (!fileInput.files.length) { showMsg('editMsg', 'กรุณาเลือกไฟล์รูปก่อน', 'error'); return; }
@@ -1349,7 +1372,7 @@
             showMsg('editMsg', 'อัปโหลดสำเร็จ (รอเผยแพร่) ชื่อไฟล์: ' + res.fileName, 'success');
             document.getElementById('editPhotoPreview').outerHTML =
               '<img class="photo-preview" id="editPhotoPreview" src="' + res.photoUrl + '">';
-            document.getElementById('btnSearch').click();
+            refreshAllStudentLists();
           })
           .withFailureHandler(function (err) {
             btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
@@ -1369,7 +1392,7 @@
         .withSuccessHandler(function () {
           btn.disabled = false;
           showMsg('editMsg', 'บันทึกรหัสจริงสำเร็จ', 'success');
-          document.getElementById('btnSearch').click();
+          refreshAllStudentLists();
         })
         .withFailureHandler(function (err) {
           btn.disabled = false;
@@ -1397,7 +1420,7 @@
         .withSuccessHandler(function () {
           btn.disabled = false;
           showMsg('editMsg', 'บันทึกรหัสชั่วคราวสำเร็จ', 'success');
-          document.getElementById('btnSearch').click();
+          refreshAllStudentLists();
         })
         .withFailureHandler(function (err) {
           btn.disabled = false;
@@ -1417,7 +1440,7 @@
       google.script.run
         .withSuccessHandler(function () {
           btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
-          document.getElementById('btnSearch').click();
+          refreshAllStudentLists();
           closeEditModal();
         })
         .withFailureHandler(function (err) {
