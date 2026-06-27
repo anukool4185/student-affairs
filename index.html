@@ -210,6 +210,51 @@
     </div>
   </div>
 
+  <!-- ============ POPUP: แก้ไขข้อมูลนักเรียน (ใช้ร่วมกันทั้งแท็บจัดการข้อมูล และแท็บจัดการรูปภาพ) ============ -->
+  <!-- ย้ายมาไว้ระดับบนสุด (ไม่อยู่ใน .panel ใดๆ) เพราะ position:fixed จะไม่แสดงผลถ้า ancestor มี display:none -->
+  <div class="modal-overlay" id="editFormCard">
+    <div class="modal-box">
+      <button class="modal-close" id="btnCloseEditModal" type="button" title="ปิด">✕</button>
+      <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
+      <div id="editMsg"></div>
+
+      <div id="editPhotoPreviewWrap"></div>
+      <label>เปลี่ยนรูปภาพ</label>
+      <input type="file" id="editPhotoFile" accept="image/*">
+      <div class="hint">อัปโหลดแล้วรูปจะเข้าโฟลเดอร์ชั่วคราวก่อน (สถานะกลับเป็น "รอเผยแพร่") รอแอดมินกด "จัดการส่งข้อมูล" เพื่อจัดเข้าตำแหน่งใหม่ตามวันที่/ชั่วโมง/ชั้น/ห้องล่าสุด</div>
+      <br>
+      <button class="btn small" id="btnSaveEditPhoto" type="button">อัปโหลด/เปลี่ยนรูป</button>
+      <div class="divider"></div>
+
+      <div class="grid">
+        <div><label>เบอร์โทร</label><input id="editPhone"></div>
+      </div>
+      <div class="grid" style="margin-top:10px;">
+        <div>
+          <label>รหัสนักเรียนจริง (ลบให้ว่างเพื่อยกเลิก กลับไปใช้รหัสชั่วคราว)</label>
+          <div class="inline-form">
+            <input id="editRealId">
+            <button class="btn small secondary" id="btnSaveRealId" type="button">บันทึกรหัสจริง</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid" id="editTempIdWrap" style="display:none;margin-top:10px;">
+        <div>
+          <label>รหัสชั่วคราว (แก้ไขได้เฉพาะแอดมิน)</label>
+          <div class="inline-form">
+            <input id="editTempId">
+            <button class="btn small secondary" id="btnSaveTempId" type="button">บันทึกรหัสชั่วคราว</button>
+          </div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div id="editCustomFieldsWrap"></div>
+      <div id="editCustomFileFieldsWrap"></div>
+      <br>
+      <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
+    </div>
+  </div>
+
   <!-- ============ MAIN APP ============ -->
   <div id="appScreen" style="display:none;">
     <header>
@@ -340,7 +385,7 @@
           <button data-sub="searchEdit" class="active">ค้นหา/แก้ไขข้อมูล</button>
           <button data-sub="confirm">ยืนยันรหัสจริง</button>
           <button data-sub="move">ย้ายห้อง</button>
-          <button data-sub="promote">เลื่อนชั้น</button>
+          <button data-sub="promote" id="navSubPromote">เลื่อนชั้น</button>
         </div>
 
         <!-- sub: ค้นหา/แก้ไขข้อมูล -->
@@ -355,51 +400,11 @@
             <br>
             <button class="btn" id="btnSearch">ค้นหา</button>
             <div id="searchResults" style="margin-top:16px;"></div>
-            <div class="divider"></div>
-            <button class="btn danger" id="btnDeleteAllStudents">🗑️ ลบข้อมูลนักเรียนทั้งหมด (รวมรูปทั้งหมด)</button>
-            <div class="hint">ใช้เมื่อต้องการล้างระบบทั้งหมดเริ่มใหม่เท่านั้น — ลบข้อมูลทุกคนและรูปทุกไฟล์ในทุกโฟลเดอร์ ทำแล้วกู้คืนไม่ได้</div>
-          </div>
-
-          <div class="modal-overlay" id="editFormCard">
-            <div class="modal-box">
-              <button class="modal-close" id="btnCloseEditModal" type="button" title="ปิด">✕</button>
-              <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
-              <div id="editMsg"></div>
-
-              <div id="editPhotoPreviewWrap"></div>
-              <label>เปลี่ยนรูปภาพ</label>
-              <input type="file" id="editPhotoFile" accept="image/*">
-              <div class="hint">อัปโหลดแล้วรูปจะเข้าโฟลเดอร์ชั่วคราวก่อน (สถานะกลับเป็น "รอเผยแพร่") รอแอดมินกด "จัดการส่งข้อมูล" เพื่อจัดเข้าตำแหน่งใหม่ตามวันที่/ชั่วโมง/ชั้น/ห้องล่าสุด</div>
-              <br>
-              <button class="btn small" id="btnSaveEditPhoto" type="button">อัปโหลด/เปลี่ยนรูป</button>
-              <div class="divider"></div>
-
-              <div class="grid">
-                <div><label>เบอร์โทร</label><input id="editPhone"></div>
-              </div>
-              <div class="grid" style="margin-top:10px;">
-                <div>
-                  <label>รหัสนักเรียนจริง (ลบให้ว่างเพื่อยกเลิก กลับไปใช้รหัสชั่วคราว)</label>
-                  <div class="inline-form">
-                    <input id="editRealId">
-                    <button class="btn small secondary" id="btnSaveRealId" type="button">บันทึกรหัสจริง</button>
-                  </div>
-                </div>
-              </div>
-              <div class="grid" id="editTempIdWrap" style="display:none;margin-top:10px;">
-                <div>
-                  <label>รหัสชั่วคราว (แก้ไขได้เฉพาะแอดมิน)</label>
-                  <div class="inline-form">
-                    <input id="editTempId">
-                    <button class="btn small secondary" id="btnSaveTempId" type="button">บันทึกรหัสชั่วคราว</button>
-                  </div>
-                </div>
-              </div>
-              <div class="divider"></div>
-              <div id="editCustomFieldsWrap"></div>
-              <div id="editCustomFileFieldsWrap"></div>
-              <br>
-              <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
+            <div class="divider" id="adminDeleteZoneDivider" style="display:none;"></div>
+            <div id="adminDeleteZone" style="display:none;">
+              <button class="btn danger" id="btnDeleteFilteredStudents" style="margin-right:8px;">🗑️ ลบเฉพาะรายการที่กรองไว้</button>
+              <button class="btn danger" id="btnDeleteAllStudents">🗑️ ลบข้อมูลนักเรียนทั้งหมด (รวมรูปทั้งหมด)</button>
+              <div class="hint">"ลบเฉพาะที่กรอง" จะลบตามเงื่อนไขค้นหาด้านบนตอนนี้เท่านั้น — "ลบทั้งหมด" ใช้เมื่อต้องการล้างระบบทั้งหมดเริ่มใหม่เท่านั้น ทั้งสองปุ่มลบรูปและกู้คืนไม่ได้</div>
             </div>
           </div>
         </div>
@@ -548,6 +553,10 @@
           <div id="studentMsg"></div>
           <div id="studentInfoBox">กำลังโหลด...</div>
         </div>
+      </section>
+
+      <!-- ============ TAB: ส่งข้อความถึงแอดมิน (student) ============ -->
+      <section class="panel" id="panel-studentMessage">
         <div class="card">
           <h2>ส่งข้อความถึงแอดมิน</h2>
           <div id="studentMsgSendBox"></div>
@@ -709,12 +718,12 @@
     const TAB_LABELS = {
       formbuilder: 'จัดการฟอร์มข้อมูล', announcements: 'จัดการประชาสัมพันธ์', register: 'ลงทะเบียนนักเรียน', photos: 'จัดการรูปภาพ', dataManage: 'จัดการข้อมูล',
       messages: 'จัดการข้อความ', myRequests: 'ส่งคำขอถึงแอดมิน', publish: 'การจัดส่งข้อมูล',
-      student: 'ข้อมูลของฉัน', company: 'ดาวน์โหลดข้อมูล', account: 'บัญชีของฉัน'
+      student: 'ข้อมูลของฉัน', studentMessage: 'ส่งข้อความถึงแอดมิน', company: 'ดาวน์โหลดข้อมูล', account: 'บัญชีของฉัน'
     };
     const ROLE_TABS = {
       admin: ['formbuilder', 'announcements', 'register', 'photos', 'dataManage', 'messages', 'publish', 'account'],
       teacher: ['register', 'photos', 'dataManage', 'myRequests', 'account'],
-      student: ['student'],
+      student: ['student', 'studentMessage'],
       company: ['company', 'account']
     };
     const ROLE_THAI = { admin: 'ผู้ดูแลระบบ', teacher: 'ครูที่ปรึกษา', student: 'นักเรียน', company: 'บริษัท' };
@@ -821,10 +830,11 @@
       return html;
     }
     /** รหัสนักเรียน(ชั่วคราว) + รหัสจริง + ชื่อ + นามสกุล อยู่แถวเดียวกันเสมอ ไม่ตัดบรรทัด */
-    function codesAndNameRow(s) {
+    function codesAndNameRow(s, allowWrap) {
       const nameVal = guessFieldByLabel_(s.customFields, 'ชื่อ');
       const lastNameVal = guessFieldByLabel_(s.customFields, 'นามสกุล');
-      let html = '<span style="white-space:nowrap;">' + bothCodesFor(s) +
+      const wrapStyle = allowWrap ? '' : 'white-space:nowrap;';
+      let html = '<span style="' + wrapStyle + '">' + bothCodesFor(s) +
         (nameVal ? ' ' + escapeHtml(nameVal) : '') +
         (lastNameVal ? ' ' + escapeHtml(lastNameVal) : '') + '</span>';
       return html;
@@ -914,6 +924,9 @@
       document.getElementById('appScreen').style.display = 'block';
       document.getElementById('userLabel').textContent = DISPLAY_NAME + ' (' + (ROLE_THAI[ROLE] || ROLE) + ')';
       document.getElementById('adminUsersCard').style.display = (ROLE === 'admin') ? 'block' : 'none';
+      document.getElementById('adminDeleteZone').style.display = (ROLE === 'admin') ? 'block' : 'none';
+      document.getElementById('adminDeleteZoneDivider').style.display = (ROLE === 'admin') ? 'block' : 'none';
+      document.getElementById('navSubPromote').style.display = (ROLE === 'admin') ? '' : 'none';
       document.getElementById('adminBellRow').style.display = (ROLE === 'admin') ? 'inline-flex' : 'none';
       if (ROLE === 'admin') loadBellCounts();
 
@@ -1380,14 +1393,14 @@
       photoListCache = list;
       const container = document.getElementById('photoStudentList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
+      let html = '<table style="table-layout:fixed;"><tr><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
       list.forEach(function (s) {
         html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td style="font-size:11px;">' + codesAndNameRow(s) + '</td>' +
+          '<td style="font-size:11px;word-break:break-word;">' + codesAndNameRow(s, true) + '</td>' +
           '</tr>';
       });
-      html += '</table></div>';
+      html += '</table>';
       container.innerHTML = html;
     }
 
@@ -1753,7 +1766,7 @@
     function initPromoteTab() {
       if (!document.getElementById('promoteFromGrade').options.length) {
         fillSelect(document.getElementById('promoteFromGrade'), gradeOptions, null);
-        fillSelect(document.getElementById('promoteFromRoom'), roomOptions, null);
+        fillSelect(document.getElementById('promoteFromRoom'), roomOptions, 'ทั้งระดับชั้น (ทุกห้อง)');
         fillSelect(document.getElementById('promoteToGrade'), gradeOptions, null);
         fillSelect(document.getElementById('promoteToRoom'), roomOptions, null);
       }
@@ -1762,19 +1775,20 @@
     document.getElementById('btnPromoteSearch').addEventListener('click', function () {
       const grade = document.getElementById('promoteFromGrade').value;
       const room = document.getElementById('promoteFromRoom').value;
-      if (!grade || !room) { alert('กรุณาเลือกระดับชั้นและห้องเดิม'); return; }
+      if (!grade) { alert('กรุณาเลือกระดับชั้นเดิม'); return; }
       const container = document.getElementById('promoteResults');
       container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
       google.script.run
         .withSuccessHandler(function (list) {
           promoteListCache = list;
-          if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบนักเรียนในห้องนี้</div>'; return; }
+          if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบนักเรียน' + (room ? 'ในห้องนี้' : 'ในระดับชั้นนี้') + '</div>'; return; }
           let html = '<div class="inline-form" style="margin-bottom:8px;"><label><input type="checkbox" id="promoteSelectAll"> เลือกทั้งหมด</label></div>';
-          html += '<div class="table-scroll"><table><tr><th></th><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
+          html += '<div class="table-scroll"><table><tr><th></th><th>รูป</th><th>รหัส / ชื่อ</th><th>ห้องปัจจุบัน</th></tr>';
           list.forEach(function (s) {
             html += '<tr><td><input type="checkbox" class="promoteChk" value="' + s.id + '"></td>' +
               '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-              '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td></tr>';
+              '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
+              '<td>' + escapeHtml(s.room) + '</td></tr>';
           });
           html += '</table></div>';
           container.innerHTML = html;
@@ -1828,6 +1842,32 @@
           alert('เกิดข้อผิดพลาด: ' + err.message);
         })
         .adminDeleteAllStudents(TOKEN);
+    });
+
+    document.getElementById('btnDeleteFilteredStudents').addEventListener('click', function () {
+      const filter = {
+        query: document.getElementById('searchQuery').value.trim(),
+        grade: document.getElementById('searchGrade').value,
+        room: document.getElementById('searchRoom').value
+      };
+      if (!filter.query && !filter.grade && !filter.room) {
+        alert('กรุณาระบุเงื่อนไขกรอง (คำค้นหา/ระดับชั้น/ห้อง) อย่างน้อย 1 อย่างก่อนลบ เพื่อป้องกันการลบทั้งหมดโดยไม่ตั้งใจ');
+        return;
+      }
+      if (!confirm('ยืนยันลบนักเรียนทุกคนที่ตรงกับเงื่อนไขกรองตอนนี้ (รวมรูปและไฟล์แนบ) ไม่สามารถกู้คืนได้?')) return;
+      const btn = document.getElementById('btnDeleteFilteredStudents');
+      btn.disabled = true; btn.textContent = 'กำลังลบ...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false; btn.textContent = '🗑️ ลบเฉพาะรายการที่กรองไว้';
+          alert('ลบสำเร็จ ' + res.count + ' รายการ');
+          document.getElementById('btnSearch').click();
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false; btn.textContent = '🗑️ ลบเฉพาะรายการที่กรองไว้';
+          alert('เกิดข้อผิดพลาด: ' + err.message);
+        })
+        .adminDeleteFilteredStudents(TOKEN, filter);
     });
 
     // ===================================================================
