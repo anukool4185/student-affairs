@@ -572,6 +572,19 @@
           <button class="btn secondary small" id="btnExportReportCsv">📊 ดาวน์โหลด Excel (CSV)</button>
           <div id="publishReportTable" style="margin-top:14px;"></div>
         </div>
+
+        <div class="card">
+          <h2>ประวัติการส่งข้อมูลทั้งหมด</h2>
+          <div class="hint">รายการเดียวกับที่บริษัทเห็นในแท็บดาวน์โหลดข้อมูล — พื้นเขียวคือบริษัทดาวน์โหลดไปแล้ว รายการจะไม่หายไปเองจนกว่าจะลบ</div>
+          <br>
+          <div class="inline-form">
+            <button class="btn secondary small" id="btnRefreshSendHistory">รีเฟรชรายการ</button>
+            <button class="btn small danger" id="btnDeleteSelectedHistory">ลบที่เลือก</button>
+            <button class="btn small danger" id="btnDeleteAllHistory">ลบทั้งหมด</button>
+          </div>
+          <div id="sendHistoryMsg" style="margin-top:10px;"></div>
+          <div id="sendHistoryList" style="margin-top:14px;"></div>
+        </div>
       </section>
 
       <!-- ============ TAB: ข้อมูลของฉัน (student) ============ -->
@@ -1058,7 +1071,7 @@
       if (tab === 'dataManage') switchSubTab('searchEdit');
       if (tab === 'student') loadMyInfo();
       if (tab === 'account') loadAccountTab();
-      if (tab === 'publish') { loadPendingList(); loadDataUpdatesList(); }
+      if (tab === 'publish') { loadPendingList(); loadDataUpdatesList(); loadSendHistory(); }
       if (tab === 'messages') { loadRequestsList(); loadHandledList(); }
       if (tab === 'myRequests') loadMyRequestsList();
       if (tab === 'company') loadCompanyNotifications();
@@ -2123,9 +2136,73 @@
           });
         })
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
-        .getRecentlyModifiedStudents(TOKEN);
+        .getRecentlyModifiedStudents(TOKEN, false);
     }
     document.getElementById('btnRefreshDataUpdates').addEventListener('click', loadDataUpdatesList);
+
+    // ===================================================================
+    // ประวัติการส่งข้อมูลทั้งหมด (แอดมิน) — รายการเดียวกับที่บริษัทเห็น
+    // ===================================================================
+    function loadSendHistory() {
+      const container = document.getElementById('sendHistoryList');
+      container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+      google.script.run
+        .withSuccessHandler(renderSendHistory)
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
+        .adminListSendHistory(TOKEN);
+    }
+    document.getElementById('btnRefreshSendHistory').addEventListener('click', loadSendHistory);
+
+    function renderSendHistory(list) {
+      const container = document.getElementById('sendHistoryList');
+      if (!list.length) { container.innerHTML = '<div class="empty">ยังไม่มีประวัติการส่งข้อมูล</div>'; return; }
+      let html = '<table><tr><th><input type="checkbox" id="historySelectAll"></th><th>ประเภท</th><th>รหัส / ชื่อ</th><th>วันที่ส่ง</th><th>เส้นทาง</th><th>สถานะ</th></tr>';
+      list.forEach(function (h) {
+        const fakeStudent = { realId: h.realId, tempId: h.tempId, customFields: h.customFields, phone: h.phone };
+        const statusHtml = h.downloadedAt
+          ? '<span class="badge status-approved">บริษัทดาวน์โหลดแล้ว ' + escapeHtml(h.downloadedAt) + '</span>'
+          : '<span class="badge status-waiting">รอบริษัทดาวน์โหลด</span>';
+        html += '<tr>' +
+          '<td><input type="checkbox" class="historyChk" value="' + h.rowNum + '"></td>' +
+          '<td>' + (h.type === 'รูป' ? '📷' : '📄') + ' ' + escapeHtml(h.type) + '</td>' +
+          '<td style="font-size:12px;">' + codesAndNameRow(fakeStudent) + '</td>' +
+          '<td>' + escapeHtml(h.date) + ' ' + escapeHtml(h.hour) + ':00</td>' +
+          '<td style="font-size:11px;">' + (h.photoPath ? escapeHtml(h.photoPath) : '<span class="hint">-</span>') + '</td>' +
+          '<td>' + statusHtml + ' <button class="btn small danger" onclick="deleteOneSendHistory(' + h.rowNum + ')">ลบ</button></td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      document.getElementById('historySelectAll').addEventListener('change', function (e) {
+        document.querySelectorAll('.historyChk').forEach(function (c) { c.checked = e.target.checked; });
+      });
+    }
+
+    function deleteOneSendHistory(rowNum) {
+      if (!confirm('ยืนยันลบประวัติรายการนี้?')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadSendHistory(); })
+        .withFailureHandler(function (err) { alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteSendHistoryRow(TOKEN, rowNum);
+    }
+
+    document.getElementById('btnDeleteSelectedHistory').addEventListener('click', function () {
+      const rows = Array.prototype.map.call(document.querySelectorAll('.historyChk:checked'), function (c) { return parseInt(c.value, 10); });
+      if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการลบ', 'error'); return; }
+      if (!confirm('ยืนยันลบ ' + rows.length + ' รายการที่เลือก?')) return;
+      google.script.run
+        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบสำเร็จ', 'success'); loadSendHistory(); })
+        .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+        .adminDeleteSendHistoryRows(TOKEN, rows);
+    });
+
+    document.getElementById('btnDeleteAllHistory').addEventListener('click', function () {
+      if (!confirm('ยืนยันลบประวัติการส่งข้อมูลทั้งหมด? ทำแล้วกู้คืนไม่ได้')) return;
+      google.script.run
+        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบทั้งหมดสำเร็จ', 'success'); loadSendHistory(); })
+        .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+        .adminDeleteAllSendHistory(TOKEN);
+    });
 
     function loadPendingList() {
       const dateInput = document.getElementById('publishDate');
@@ -2179,6 +2256,7 @@
           renderPublishReport(res);
           loadPendingList();
           loadDataUpdatesList();
+          loadSendHistory();
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'เผยแพร่/ส่งรายการที่เลือก';
@@ -2710,7 +2788,7 @@
           box.innerHTML = html;
         })
         .withFailureHandler(function (err) { box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
-        .getRecentlyModifiedStudents(TOKEN);
+        .getRecentlyModifiedStudents(TOKEN, true);
     });
     document.getElementById('btnCloseBellData').addEventListener('click', function () {
       document.getElementById('bellDataModal').classList.remove('active');
