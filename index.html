@@ -11,13 +11,18 @@
       --border: #e2e8f0; --text: #1e293b; --text-muted: #64748b; --success: #16a34a; --danger: #dc2626;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); }
+    html { overflow-x: hidden; width: 100%; }
+    body { margin: 0; font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; width: 100%; }
 
     #loginScreen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; gap: 24px; }
+    #loginContentRow { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; }
     .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
     .login-card h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
     .login-card p.sub { text-align: center; color: var(--text-muted); font-size: 13px; margin: 0 0 22px; }
-    .announcement-block { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; width: 100%; max-width: 320px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    .announcement-block { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; width: 100%; max-width: 360px; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    @media (min-width: 768px) {
+      #loginContentRow { flex-direction: row; align-items: flex-start; justify-content: center; }
+    }
     .announcement-block h2 { font-size: 15px; margin: 0 0 14px; }
     .announcement-item { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
     .announcement-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
@@ -139,6 +144,7 @@
       <span class="bell-pill" title="รูปใหม่ที่รอเผยแพร่">🖼️ <span id="bellNewPhotos">0</span></span>
       <span class="bell-pill" title="ข้อความ/คำขอใหม่">💬 <span id="bellNewMessages">0</span></span>
     </div>
+    <div id="loginContentRow">
     <div class="announcement-block" id="announcementBlock" style="display:none;">
       <h2>📢 ประกาศ</h2>
       <div id="announcementList"></div>
@@ -159,6 +165,7 @@
       </p>
       <div class="divider"></div>
       <button class="btn secondary full" id="btnOpenPublicRegister">📝 ลงทะเบียนนักเรียน</button>
+    </div>
     </div>
   </div>
 
