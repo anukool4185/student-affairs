@@ -579,13 +579,24 @@
           <br>
           <div class="inline-form">
             <button class="btn secondary small" id="btnRefreshSendHistory">รีเฟรชรายการ</button>
+            <button class="btn small secondary" id="btnViewSelectedHistory">ดูรายละเอียดที่เลือก</button>
+            <button class="btn small secondary" id="btnDownloadSelectedHistory">ดาวน์โหลดที่เลือก</button>
+            <button class="btn small secondary" id="btnPrintSelectedHistory">🖨️ พิมพ์ที่เลือก</button>
             <button class="btn small danger" id="btnDeleteSelectedHistory">ลบที่เลือก</button>
             <button class="btn small danger" id="btnDeleteAllHistory">ลบทั้งหมด</button>
           </div>
           <div id="sendHistoryMsg" style="margin-top:10px;"></div>
           <div id="sendHistoryList" style="margin-top:14px;"></div>
         </div>
+
+        <div class="card" id="sendHistoryDetailCard" style="display:none;">
+          <h2>รายละเอียดที่เลือก</h2>
+          <div class="hint">แสดงข้อมูลของรายการที่เลือกไว้ทั้งหมดในหน้าเดียวกัน ดาวน์โหลด/พิมพ์รวมกันได้</div>
+          <br>
+          <div id="sendHistoryDetailTable"></div>
+        </div>
       </section>
+
 
       <!-- ============ TAB: ข้อมูลของฉัน (student) ============ -->
       <section class="panel" id="panel-student">
@@ -2161,7 +2172,9 @@
     }
     document.getElementById('btnRefreshSendHistory').addEventListener('click', loadSendHistory);
 
+    let sendHistoryCache = [];
     function renderSendHistory(list) {
+      sendHistoryCache = list;
       const container = document.getElementById('sendHistoryList');
       if (!list.length) { container.innerHTML = '<div class="empty">ยังไม่มีประวัติการส่งข้อมูล</div>'; return; }
       let html = '<table><tr><th><input type="checkbox" id="historySelectAll"></th><th>ประเภท</th><th>รหัส / ชื่อ</th><th>วันที่ส่ง</th><th>เส้นทาง</th><th>สถานะ</th></tr>';
@@ -2210,6 +2223,63 @@
         .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบทั้งหมดสำเร็จ', 'success'); loadSendHistory(); })
         .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
         .adminDeleteAllSendHistory(TOKEN);
+    });
+
+    function getCheckedHistoryRows() {
+      return Array.prototype.map.call(document.querySelectorAll('.historyChk:checked'), function (c) { return parseInt(c.value, 10); });
+    }
+
+    function populateHistoryDetail() {
+      const rows = getCheckedHistoryRows();
+      if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการอย่างน้อย 1 รายการ', 'error'); return false; }
+      const selected = sendHistoryCache.filter(function (h) { return rows.indexOf(h.rowNum) !== -1; });
+      const card = document.getElementById('sendHistoryDetailCard');
+      const container = document.getElementById('sendHistoryDetailTable');
+      let html = '<table><tr><th>รูป</th><th>ประเภท</th><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>วันที่ส่ง</th><th>เส้นทาง</th><th>สถานะ</th></tr>';
+      selected.forEach(function (h) {
+        const statusHtml = h.downloadedAt
+          ? '<span class="badge status-approved">ดาวน์โหลดแล้ว ' + escapeHtml(h.downloadedAt) + '</span>'
+          : '<span class="badge status-waiting">รอดาวน์โหลด</span>';
+        html += '<tr>' +
+          '<td>' + (h.photoUrl ? '<img class="thumb" src="' + h.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + (h.type === 'รูป' ? '📷' : '📄') + ' ' + escapeHtml(h.type) + '</td>' +
+          '<td>' + escapeHtml(h.realId || '-') + '</td>' +
+          '<td>' + escapeHtml(h.tempId) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(h.customFields, h.phone) + '</td>' +
+          '<td>' + escapeHtml((h.grade || '') + (h.room ? ' / ' + h.room : '')) + '</td>' +
+          '<td>' + escapeHtml(h.date) + ' ' + escapeHtml(h.hour) + ':00</td>' +
+          '<td style="font-size:11px;">' + (h.photoPath ? escapeHtml(h.photoPath) : '<span class="hint">-</span>') + '</td>' +
+          '<td>' + statusHtml + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      card.style.display = 'block';
+      return true;
+    }
+
+    document.getElementById('btnViewSelectedHistory').addEventListener('click', function () {
+      if (populateHistoryDetail()) {
+        document.getElementById('sendHistoryDetailCard').scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
+    document.getElementById('btnPrintSelectedHistory').addEventListener('click', function () {
+      if (populateHistoryDetail()) printElement('sendHistoryDetailTable');
+    });
+
+    document.getElementById('btnDownloadSelectedHistory').addEventListener('click', function () {
+      const rows = getCheckedHistoryRows();
+      if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการดาวน์โหลดอย่างน้อย 1 รายการ', 'error'); return; }
+      google.script.run
+        .withSuccessHandler(function (res) {
+          const link = document.createElement('a');
+          link.href = 'data:application/octet-stream;base64,' + res.base64;
+          link.download = res.filename;
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        })
+        .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+        .adminDownloadSendHistoryRows(TOKEN, rows);
     });
 
     function loadPendingList() {
