@@ -114,6 +114,11 @@
       cursor: pointer; color: var(--text-muted);
     }
     .modal-close:hover { color: var(--text); }
+    @media print {
+      body * { visibility: hidden; }
+      #publishReportTable, #publishReportTable * { visibility: visible; }
+      #publishReportTable { position: absolute; top: 0; left: 0; width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -287,6 +292,15 @@
               <button class="modal-close" id="btnCloseEditModal" type="button" title="ปิด">✕</button>
               <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
               <div id="editMsg"></div>
+
+              <div id="editPhotoPreviewWrap"></div>
+              <label>เปลี่ยนรูปภาพ</label>
+              <input type="file" id="editPhotoFile" accept="image/*">
+              <div class="hint">อัปโหลดแล้วรูปจะเข้าโฟลเดอร์ชั่วคราวก่อน (สถานะกลับเป็น "รอเผยแพร่") รอแอดมินกด "จัดการส่งข้อมูล" เพื่อจัดเข้าตำแหน่งใหม่ตามวันที่/ชั่วโมง/ชั้น/ห้องล่าสุด</div>
+              <br>
+              <button class="btn small" id="btnSaveEditPhoto" type="button">อัปโหลด/เปลี่ยนรูป</button>
+              <div class="divider"></div>
+
               <div class="grid">
                 <div><label>เบอร์โทร</label><input id="editPhone"></div>
               </div>
@@ -354,8 +368,8 @@
             <div class="grid">
               <div><label>ระดับชั้นใหม่</label><select id="moveNewGrade"></select></div>
               <div><label>ห้องใหม่</label><select id="moveNewRoom"></select></div>
-              <div id="moveDateWrap" style="display:none;"><label>วันที่ใหม่ (ไม่บังคับ ถ้าต้องการกำหนดใหม่)</label><input type="date" id="moveNewDate"></div>
             </div>
+            <div class="hint">ถ้ารูปเผยแพร่ไปแล้ว การย้ายห้องจะทำให้สถานะกลับเป็น "รอเผยแพร่" และจะถูกจัดเข้าตำแหน่งใหม่ตอนแอดมินกด "จัดการส่งข้อมูล" รอบถัดไป</div>
             <br>
             <button class="btn" id="btnConfirmMove">ยืนยันการย้ายห้อง</button>
           </div>
@@ -385,17 +399,26 @@
       <section class="panel" id="panel-publish">
         <div class="card">
           <h2>รูปที่รออยู่ในโฟลเดอร์ชั่วคราว (รอเผยแพร่)</h2>
-          <div class="hint">เลือกรายการที่ต้องการเผยแพร่ ระบุวันที่กิจกรรม (ไม่บังคับ) แล้วกด "เผยแพร่"</div>
+          <div class="hint">เลือกรายการที่ต้องการเผยแพร่ ระบุวันที่ส่งข้อมูล (ค่าเริ่มต้น = วันนี้) แล้วกด "เผยแพร่" — ระบบจะจัดเก็บตามโครงสร้าง วันที่ / ชั่วโมงที่ส่ง / ระดับชั้น / ห้อง โดยอัตโนมัติ</div>
           <br>
           <button class="btn secondary small" id="btnRefreshPending">รีเฟรชรายการ</button>
           <div id="pendingMsg" style="margin-top:10px;"></div>
           <div id="pendingList" style="margin-top:14px;"></div>
           <div class="divider"></div>
           <div class="grid">
-            <div><label>วันที่กิจกรรม (ไม่ระบุ = ไม่มีโฟลเดอร์วันที่)</label><input type="date" id="publishDate"></div>
+            <div><label>วันที่ส่งข้อมูล</label><input type="date" id="publishDate"></div>
           </div>
           <br>
           <button class="btn success" id="btnPublishSelected">เผยแพร่รายการที่เลือก</button>
+        </div>
+
+        <div class="card" id="publishReportCard" style="display:none;">
+          <h2>รายงานข้อมูลที่ส่งล่าสุด</h2>
+          <div class="hint">ส่งให้บริษัทได้โดยพิมพ์ออกมา หรือดาวน์โหลดเป็นไฟล์ — ใช้ปุ่มด้านล่าง</div>
+          <br>
+          <button class="btn secondary small" id="btnPrintReport">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+          <button class="btn secondary small" id="btnExportReportCsv">📊 ดาวน์โหลด Excel (CSV)</button>
+          <div id="publishReportTable" style="margin-top:14px;"></div>
         </div>
       </section>
 
@@ -734,7 +757,6 @@
       document.getElementById('appScreen').style.display = 'block';
       document.getElementById('userLabel').textContent = DISPLAY_NAME + ' (' + (ROLE_THAI[ROLE] || ROLE) + ')';
       document.getElementById('adminUsersCard').style.display = (ROLE === 'admin') ? 'block' : 'none';
-      document.getElementById('moveDateWrap').style.display = (ROLE === 'admin') ? 'block' : 'none';
 
       // รีเซ็ตทุกครั้งที่ล็อกอินใหม่ — กันค่าจากเซสชันครูคนก่อนติดค้างอยู่ (เช่น สลับมา login เป็นแอดมินแล้วยังเห็นแค่ห้องเดิม)
       MY_SCOPE = null;
@@ -1298,6 +1320,10 @@
       document.getElementById('editStudentLabel').textContent = s.activeCode;
       document.getElementById('editPhone').value = s.phone;
       document.getElementById('editRealId').value = s.realId;
+      document.getElementById('editPhotoPreviewWrap').innerHTML =
+        (s.photoUrl ? '<img class="photo-preview" id="editPhotoPreview" src="' + s.photoUrl + '">' : '<div class="photo-preview" id="editPhotoPreview"></div>') +
+        '<p class="hint">สถานะรูป: ' + statusBadge(s) + '</p>';
+      document.getElementById('editPhotoFile').value = '';
       if (ROLE === 'admin') {
         document.getElementById('editTempIdWrap').style.display = 'block';
         document.getElementById('editTempId').value = s.tempId;
@@ -1308,6 +1334,30 @@
       renderCustomFileFields('editCustomFileFieldsWrap', formFields, id, s.customFields);
       document.getElementById('editFormCard').classList.add('active');
     }
+
+    document.getElementById('btnSaveEditPhoto').addEventListener('click', function () {
+      const fileInput = document.getElementById('editPhotoFile');
+      if (!fileInput.files.length) { showMsg('editMsg', 'กรุณาเลือกไฟล์รูปก่อน', 'error'); return; }
+      if (!currentEditId) return;
+      const file = fileInput.files[0];
+      const btn = document.getElementById('btnSaveEditPhoto');
+      btn.disabled = true; btn.textContent = 'กำลังอัปโหลด...';
+      fileToBase64(file, function (base64) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
+            showMsg('editMsg', 'อัปโหลดสำเร็จ (รอเผยแพร่) ชื่อไฟล์: ' + res.fileName, 'success');
+            document.getElementById('editPhotoPreview').outerHTML =
+              '<img class="photo-preview" id="editPhotoPreview" src="' + res.photoUrl + '">';
+            document.getElementById('btnSearch').click();
+          })
+          .withFailureHandler(function (err) {
+            btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
+            if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+          })
+          .uploadPhotoForStudent(TOKEN, currentEditId, base64, file.type, file.name);
+      });
+    });
 
     document.getElementById('btnSaveRealId').addEventListener('click', function () {
       const val = document.getElementById('editRealId').value.trim();
@@ -1484,7 +1534,6 @@
       btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
 
       if (ROLE === 'admin') {
-        const newDate = document.getElementById('moveNewDate').value;
         google.script.run
           .withSuccessHandler(function () {
             btn.disabled = false; btn.textContent = originalLabel;
@@ -1496,7 +1545,7 @@
             btn.disabled = false; btn.textContent = originalLabel;
             if (!handleAuthError(err)) showMsg('moveMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
           })
-          .moveStudentClass(TOKEN, currentMoveStudent.id, newGrade, newRoom, newDate);
+          .moveStudentClass(TOKEN, currentMoveStudent.id, newGrade, newRoom);
       } else {
         google.script.run
           .withSuccessHandler(function () {
@@ -1533,7 +1582,7 @@
     function renderRequestsList(list) {
       const container = document.getElementById('requestsList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>'; return; }
-      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>วันที่ใหม่ (ถ้าย้าย)</th><th>ข้อความตอบกลับ</th><th>ดำเนินการ</th></tr>';
+      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>ข้อความตอบกลับ</th><th>ดำเนินการ</th></tr>';
       list.forEach(function (r) {
         const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
         html += '<tr>' +
@@ -1542,7 +1591,6 @@
           '<td>' + escapeHtml(detailTxt) + '</td>' +
           '<td>' + escapeHtml(r.requestedBy) + '</td>' +
           '<td>' + escapeHtml(r.requestedAt) + '</td>' +
-          '<td>' + (r.type === 'ย้ายห้อง' ? '<input type="date" class="reqDate" data-row="' + r.requestRow + '" style="width:140px">' : '-') + '</td>' +
           '<td><input type="text" class="reqReply" data-row="' + r.requestRow + '" placeholder="ข้อความถึงครู (ไม่บังคับ)" style="width:160px"></td>' +
           '<td>' +
             '<button class="btn small success" onclick="handleRequest(' + r.requestRow + ', \'approve\', this)">อนุมัติ</button> ' +
@@ -1555,9 +1603,7 @@
     }
 
     function handleRequest(requestRow, decision, btnEl) {
-      const dateInput = document.querySelector('.reqDate[data-row="' + requestRow + '"]');
       const replyInput = document.querySelector('.reqReply[data-row="' + requestRow + '"]');
-      const photoDate = dateInput ? dateInput.value : '';
       const replyMessage = replyInput ? replyInput.value.trim() : '';
       btnEl.closest('td').querySelectorAll('button').forEach(function (b) { b.disabled = true; });
       google.script.run
@@ -1569,7 +1615,7 @@
           if (!handleAuthError(err)) showMsg('requestsMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
           loadRequestsList();
         })
-        .adminHandleRequest(TOKEN, requestRow, decision, photoDate, replyMessage);
+        .adminHandleRequest(TOKEN, requestRow, decision, replyMessage);
     }
 
     // ===================================================================
@@ -1608,6 +1654,11 @@
     // TAB: การจัดส่งข้อมูล (admin)
     // ===================================================================
     function loadPendingList() {
+      const dateInput = document.getElementById('publishDate');
+      if (!dateInput.value) {
+        const d = new Date();
+        dateInput.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      }
       const container = document.getElementById('pendingList');
       container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
       google.script.run
@@ -1637,6 +1688,8 @@
       });
     }
 
+    let lastPublishReport = null;
+
     document.getElementById('btnPublishSelected').addEventListener('click', function () {
       const ids = Array.prototype.map.call(document.querySelectorAll('.pendingChk:checked'), function (c) { return c.value; });
       if (!ids.length) { showMsg('pendingMsg', 'กรุณาเลือกรายการที่ต้องการเผยแพร่อย่างน้อย 1 รายการ', 'error'); return; }
@@ -1646,7 +1699,9 @@
       google.script.run
         .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'เผยแพร่รายการที่เลือก';
-          showMsg('pendingMsg', 'เผยแพร่สำเร็จ ' + res.count + ' รายการ', 'success');
+          showMsg('pendingMsg', 'เผยแพร่สำเร็จ ' + res.count + ' รายการ (' + res.date + ' เวลา ' + res.hour + ':00)', 'success');
+          lastPublishReport = res;
+          renderPublishReport(res);
           loadPendingList();
         })
         .withFailureHandler(function (err) {
@@ -1654,6 +1709,52 @@
           if (!handleAuthError(err)) showMsg('pendingMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         })
         .publishPhotos(TOKEN, ids, date);
+    });
+
+    function renderPublishReport(res) {
+      const card = document.getElementById('publishReportCard');
+      const container = document.getElementById('publishReportTable');
+      if (!res.items.length) { card.style.display = 'none'; return; }
+      let html = '<p><b>วันที่ส่งข้อมูล:</b> ' + escapeHtml(res.date) + ' &nbsp; <b>เวลา:</b> ' + escapeHtml(res.hour) + ':00 น. &nbsp; <b>จำนวน:</b> ' + res.items.length + ' รายการ</p>';
+      html += '<table><tr><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>ตำแหน่งโฟลเดอร์ใหม่</th><th>ชื่อไฟล์</th></tr>';
+      res.items.forEach(function (it) {
+        html += '<tr>' +
+          '<td>' + escapeHtml(it.realId || '-') + '</td>' +
+          '<td>' + escapeHtml(it.tempId) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(it.customFields) + '</td>' +
+          '<td>' + escapeHtml(it.grade + ' / ' + it.room) + '</td>' +
+          '<td style="font-size:12px;">' + escapeHtml(it.photoPath) + '</td>' +
+          '<td>' + escapeHtml(it.photoFile) + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      card.style.display = 'block';
+      card.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btnPrintReport').addEventListener('click', function () {
+      window.print();
+    });
+
+    document.getElementById('btnExportReportCsv').addEventListener('click', function () {
+      if (!lastPublishReport || !lastPublishReport.items.length) { alert('ยังไม่มีรายงานให้ดาวน์โหลด'); return; }
+      const rows = [['รหัสจริง', 'รหัสชั่วคราว', 'ข้อมูลเพิ่มเติม', 'ระดับชั้น', 'ห้อง', 'ตำแหน่งโฟลเดอร์ใหม่', 'ชื่อไฟล์']];
+      lastPublishReport.items.forEach(function (it) {
+        const infoText = formFields.filter(function (f) { return !fieldIsFile(f); })
+          .map(function (f) { return it.customFields[f.id] ? (f.label + ': ' + it.customFields[f.id]) : ''; })
+          .filter(Boolean).join(' | ');
+        rows.push([it.realId || '', it.tempId, infoText, it.grade, it.room, it.photoPath, it.photoFile]);
+      });
+      const csvContent = '\uFEFF' + rows.map(function (r) {
+        return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+      }).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'รายงานส่งข้อมูล_' + lastPublishReport.date + '_' + lastPublishReport.hour + '.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     });
 
     // ===================================================================
