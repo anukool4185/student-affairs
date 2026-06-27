@@ -88,6 +88,8 @@
     input.confirmed-input { background: #dcfce7 !important; border-color: #86efac; }
     .bell-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
     .bell-pill { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: default; }
+    .bell-count { display: inline-block; min-width: 18px; padding: 1px 6px; margin-left: 3px; background: var(--danger); color: #fff; font-weight: 700; font-size: 12px; border-radius: 10px; text-align: center; }
+    .bell-count.zero { background: #94a3b8; }
     .bell-pill.clickable { cursor: pointer; }
     .bell-pill.has-count { background: #fef3c7; border-color: #fde68a; font-weight: 600; }
 
@@ -140,9 +142,9 @@
   <!-- ============ LOGIN SCREEN ============ -->
   <div id="loginScreen">
     <div class="bell-row" id="publicBellRow" style="display:none;">
-      <span class="bell-pill" title="ข้อมูลใหม่/แก้ไขใหม่">🔔 <span id="bellNewData">0</span></span>
-      <span class="bell-pill" title="รูปใหม่ที่รอเผยแพร่">🖼️ <span id="bellNewPhotos">0</span></span>
-      <span class="bell-pill" title="ข้อความ/คำขอใหม่">💬 <span id="bellNewMessages">0</span></span>
+      <span class="bell-pill" title="ข้อมูลใหม่/แก้ไขใหม่">🔔 <span id="bellNewData" class="bell-count zero">0</span></span>
+      <span class="bell-pill" title="รูปใหม่ที่รอเผยแพร่">🖼️ <span id="bellNewPhotos" class="bell-count zero">0</span></span>
+      <span class="bell-pill" title="ข้อความ/คำขอใหม่">💬 <span id="bellNewMessages" class="bell-count zero">0</span></span>
     </div>
     <div id="loginContentRow">
     <div class="announcement-block" id="announcementBlock" style="display:none;">
@@ -241,7 +243,7 @@
       <div class="divider"></div>
 
       <div class="grid">
-        <div><label>เบอร์โทร</label><input id="editPhone"></div>
+        <div><label>เบอร์โทรนักเรียน (ใช้เป็นพาสเวอร์ดล็อกอิน)</label><input id="editPhone"></div>
       </div>
       <div class="grid" style="margin-top:10px;">
         <div>
@@ -278,9 +280,9 @@
       </div>
       <div class="userbox">
         <span class="bell-row" id="adminBellRow" style="display:none;">
-          <span class="bell-pill clickable" id="bellNewDataBtn" title="ข้อมูลใหม่/แก้ไขใหม่ — กดเพื่อดู">🔔 <span id="adminBellNewData">0</span></span>
-          <span class="bell-pill clickable" id="bellNewPhotosBtn" title="รูปใหม่ที่รอเผยแพร่ — กดเพื่อไปแท็บจัดการส่งข้อมูล">🖼️ <span id="adminBellNewPhotos">0</span></span>
-          <span class="bell-pill clickable" id="bellNewMessagesBtn" title="ข้อความ/คำขอใหม่ — กดเพื่อไปแท็บจัดการข้อความ">💬 <span id="adminBellNewMessages">0</span></span>
+          <span class="bell-pill clickable" id="bellNewDataBtn" title="ข้อมูลใหม่/แก้ไขใหม่ — กดเพื่อดู">🔔 <span id="adminBellNewData" class="bell-count zero">0</span></span>
+          <span class="bell-pill clickable" id="bellNewPhotosBtn" title="รูปใหม่ที่รอเผยแพร่ — กดเพื่อไปแท็บจัดการส่งข้อมูล">🖼️ <span id="adminBellNewPhotos" class="bell-count zero">0</span></span>
+          <span class="bell-pill clickable" id="bellNewMessagesBtn" title="ข้อความ/คำขอใหม่ — กดเพื่อไปแท็บจัดการข้อความ">💬 <span id="adminBellNewMessages" class="bell-count zero">0</span></span>
         </span>
         <span id="userLabel"></span>
         <button id="btnLogout">ออกจากระบบ</button>
@@ -358,8 +360,11 @@
             <div id="addRoomWrap"><label>ห้อง *</label><select id="addRoom"></select></div>
             <div><label>รหัสชั่วคราวที่จะได้</label><input id="addTempPreview" value="กรุณาเลือกระดับชั้นและห้อง" disabled style="background:#f1f5f9;font-weight:600;"></div>
           </div>
+          <div class="grid" style="margin-top:10px;">
+            <div><label>เบอร์โทรนักเรียน (ใช้เป็นพาสเวอร์ด) *</label><input id="addPhone" placeholder="0812345678"></div>
+          </div>
           <div class="hint" id="teacherScopeHint" style="display:none;"></div>
-          <div class="hint">รหัสชั่วคราวคำนวณจากปี พ.ศ. + ระดับชั้น + ห้อง + ลำดับในชั้น/ห้องเดียวกัน — แก้ไขเองไม่ได้ (ยกเว้นแอดมินแก้ได้ทีหลังที่แท็บ "จัดการข้อมูล")<br>กำหนด<b>เบอร์โทร/รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล" หลังบันทึกแล้ว และอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ"<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
+          <div class="hint">รหัสชั่วคราวคำนวณจากปี พ.ศ. + ระดับชั้น + ห้อง + ลำดับในชั้น/ห้องเดียวกัน — แก้ไขเองไม่ได้ (ยกเว้นแอดมินแก้ได้ทีหลังที่แท็บ "จัดการข้อมูล")<br>แก้ไข<b>รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล" หลังบันทึกแล้ว และอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ"<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
 
           <div class="divider"></div>
           <div id="addCustomFieldsWrap"><div class="hint">กำลังโหลดช่องข้อมูลเพิ่มเติม...</div></div>
@@ -802,9 +807,9 @@
           ['NewData', 'NewPhotos', 'NewMessages'].forEach(function (key, i) {
             const val = [counts.newData, counts.newPhotos, counts.newMessages][i];
             const pub = document.getElementById('bell' + key);
-            if (pub) pub.textContent = val;
+            if (pub) { pub.textContent = val; pub.classList.toggle('zero', !val); }
             const adm = document.getElementById('adminBell' + key);
-            if (adm) adm.textContent = val;
+            if (adm) { adm.textContent = val; adm.classList.toggle('zero', !val); }
           });
           document.getElementById('publicBellRow').style.display =
             (counts.newData || counts.newPhotos || counts.newMessages) ? 'flex' : 'none';
@@ -969,7 +974,13 @@
           renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
         });
       }
-      if (ROLE === 'student') { loadFormFieldsGlobal(); }
+      let studentTabPending = (ROLE === 'student');
+      if (ROLE === 'student') {
+        loadFormFieldsGlobal(function () {
+          studentTabPending = false;
+          if (tabs.length) switchTab(tabs[0]);
+        });
+      }
 
       if (ROLE === 'teacher') {
         google.script.run
@@ -990,7 +1001,7 @@
           .getMyScope(TOKEN);
       }
 
-      if (tabs.length) switchTab(tabs[0]);
+      if (tabs.length && !studentTabPending) switchTab(tabs[0]);
     }
 
     function switchTab(tab) {
@@ -1339,9 +1350,11 @@
     document.getElementById('btnAddStudent').addEventListener('click', function () {
       const grade = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.grade : document.getElementById('addGrade').value;
       const room = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.room : document.getElementById('addRoom').value;
+      const phone = document.getElementById('addPhone').value.trim();
       if (!grade || !room) { showMsg('addMsg', 'กรุณาเลือก ระดับชั้น และ ห้อง ให้ครบ', 'error'); return; }
+      if (!phone) { showMsg('addMsg', 'กรุณากรอกเบอร์โทรนักเรียน (ใช้เป็นพาสเวอร์ดล็อกอิน)', 'error'); return; }
       const info = {
-        grade: grade, room: room,
+        grade: grade, room: room, phone: phone,
         customValues: collectCustomFieldValues('addCustomFieldsWrap')
       };
       const btn = document.getElementById('btnAddStudent');
@@ -1349,8 +1362,9 @@
       google.script.run
         .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'บันทึกนักเรียนใหม่';
-          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — ไปอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ" และกำหนดเบอร์โทร/รหัสจริงได้ที่แท็บ "จัดการข้อมูล"', 'success');
+          showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — ไปอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ" และกำหนดรหัสจริงได้ที่แท็บ "จัดการข้อมูล"', 'success');
           renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
+          document.getElementById('addPhone').value = '';
           if (ROLE !== 'teacher') {
             document.getElementById('addGrade').value = '';
             document.getElementById('addRoom').value = '';
@@ -1407,7 +1421,7 @@
       photoListCache = list;
       const container = document.getElementById('photoStudentList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table style="table-layout:fixed;"><tr><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
+      let html = '<table style="table-layout:fixed;"><tr><th style="width:48px;">รูป</th><th>รหัส / ชื่อ</th></tr>';
       list.forEach(function (s) {
         html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
@@ -1536,7 +1550,7 @@
       } else {
         document.getElementById('editTempIdWrap').style.display = 'none';
       }
-      renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields, true);
+      renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields);
       renderCustomFileFields('editCustomFileFieldsWrap', formFields, id, s.customFields);
       document.getElementById('editFormCard').classList.add('active');
     }
@@ -1622,8 +1636,6 @@
       if (!currentEditId) return;
       const phoneVal = document.getElementById('editPhone').value.trim();
       const customValues = collectCustomFieldValues('editCustomFieldsWrap');
-      const phoneField = formFields.filter(function (f) { return f.type === 'phone'; })[0];
-      if (phoneField) customValues[phoneField.id] = phoneVal;
       const info = { phone: phoneVal, customValues: customValues };
       const btn = document.getElementById('btnSaveEdit');
       btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
@@ -1784,6 +1796,9 @@
         fillSelect(document.getElementById('promoteToGrade'), gradeOptions, null);
         fillSelect(document.getElementById('promoteToRoom'), roomOptions, null);
       }
+      promoteListCache = [];
+      document.getElementById('promoteResults').innerHTML = '<div class="hint">เลือกระดับชั้น/ห้องเดิม แล้วกดค้นหารายชื่อ</div>';
+      document.getElementById('promoteFormCard').style.display = 'none';
     }
 
     document.getElementById('btnPromoteSearch').addEventListener('click', function () {
@@ -2530,6 +2545,9 @@
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'บันทึกลงทะเบียน';
+          if (err.message.indexOf('ลงทะเบียนซ้ำ') !== -1) {
+            alert('⚠️ ' + err.message);
+          }
           showMsg('pubRegMsg', err.message, 'error');
         })
         .publicRegisterStudent(grade, room, phone, customValues);
