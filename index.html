@@ -88,6 +88,32 @@
     .photo-preview { width: 110px; height: 110px; border-radius: 10px; object-fit: cover; background: #e2e8f0; display: block; margin-bottom: 10px; }
     .divider { border-top: 1px solid var(--border); margin: 18px 0; }
     .cf-field { margin-bottom: 10px; }
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 200;
+      padding: 20px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 520px;
+      width: 100%;
+      max-height: 88vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    }
+    .modal-close {
+      position: absolute; top: 12px; right: 14px;
+      background: none; border: none; font-size: 22px; line-height: 1;
+      cursor: pointer; color: var(--text-muted);
+    }
+    .modal-close:hover { color: var(--text); }
   </style>
 </head>
 <body>
@@ -256,26 +282,29 @@
             <div id="searchResults" style="margin-top:16px;"></div>
           </div>
 
-          <div class="card" id="editFormCard" style="display:none;">
-            <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
-            <div id="editMsg"></div>
-            <div class="grid">
-              <div><label>เบอร์โทร</label><input id="editPhone"></div>
-            </div>
-            <div class="grid" id="editTempIdWrap" style="display:none;margin-top:10px;">
-              <div>
-                <label>รหัสชั่วคราว (แก้ไขได้เฉพาะแอดมิน)</label>
-                <div class="inline-form">
-                  <input id="editTempId">
-                  <button class="btn small secondary" id="btnSaveTempId" type="button">บันทึกรหัสชั่วคราว</button>
+          <div class="modal-overlay" id="editFormCard">
+            <div class="modal-box">
+              <button class="modal-close" id="btnCloseEditModal" type="button" title="ปิด">✕</button>
+              <h2>แก้ไขข้อมูล: <span id="editStudentLabel"></span></h2>
+              <div id="editMsg"></div>
+              <div class="grid">
+                <div><label>เบอร์โทร</label><input id="editPhone"></div>
+              </div>
+              <div class="grid" id="editTempIdWrap" style="display:none;margin-top:10px;">
+                <div>
+                  <label>รหัสชั่วคราว (แก้ไขได้เฉพาะแอดมิน)</label>
+                  <div class="inline-form">
+                    <input id="editTempId">
+                    <button class="btn small secondary" id="btnSaveTempId" type="button">บันทึกรหัสชั่วคราว</button>
+                  </div>
                 </div>
               </div>
+              <div class="divider"></div>
+              <div id="editCustomFieldsWrap"></div>
+              <div id="editCustomFileFieldsWrap"></div>
+              <br>
+              <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
             </div>
-            <div class="divider"></div>
-            <div id="editCustomFieldsWrap"></div>
-            <div id="editCustomFileFieldsWrap"></div>
-            <br>
-            <button class="btn" id="btnSaveEdit">บันทึกการแก้ไข</button>
           </div>
         </div>
 
@@ -285,7 +314,12 @@
             <h2>นักเรียนที่ยังใช้ "รหัสชั่วคราว" อยู่</h2>
             <div class="hint">เมื่อทราบรหัสนักเรียนจริงแล้ว กรอกแล้วกด "ยืนยัน" — ระบบจะเปลี่ยนชื่อไฟล์รูปเดิม (ตำแหน่งเดิม) ให้เป็นรหัสจริงทันที</div>
             <br>
-            <button class="btn secondary small" id="btnRefreshConfirm">รีเฟรชรายการ</button>
+            <div class="grid" id="confirmFilterWrap">
+              <div><label>ระดับชั้น</label><select id="confirmFilterGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้อง</label><select id="confirmFilterRoom"><option value="">ทั้งหมด</option></select></div>
+            </div>
+            <br>
+            <button class="btn secondary small" id="btnRefreshConfirm">ค้นหา / รีเฟรชรายการ</button>
             <div id="confirmList" style="margin-top:14px;"></div>
           </div>
         </div>
@@ -294,10 +328,13 @@
         <div class="subpanel" id="sub-move">
           <div class="card">
             <h2>ค้นหานักเรียนที่ต้องการย้ายห้อง</h2>
-            <div class="inline-form">
-              <input id="moveSearch" placeholder="ค้นหาชื่อ / รหัส...">
-              <button class="btn secondary small" id="btnMoveSearch">ค้นหา</button>
+            <div class="grid" id="moveFilterWrap">
+              <div><label>ระดับชั้นปัจจุบัน</label><select id="moveFilterGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้องปัจจุบัน</label><select id="moveFilterRoom"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ค้นหารหัส</label><input id="moveSearch" placeholder="ค้นหารหัส..."></div>
             </div>
+            <br>
+            <button class="btn secondary small" id="btnMoveSearch">ค้นหา</button>
             <div id="moveResults" style="margin-top:14px;"></div>
           </div>
 
@@ -534,6 +571,10 @@
     fillSelect(document.getElementById('moveNewRoom'), roomOptions, null);
     fillSelect(document.getElementById('searchGrade'), gradeOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('searchRoom'), roomOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('confirmFilterGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('confirmFilterRoom'), roomOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('moveFilterGrade'), gradeOptions, 'ทั้งหมด');
+    fillSelect(document.getElementById('moveFilterRoom'), roomOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('coGrade'), gradeOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('coRoom'), roomOptions, 'ทั้งหมด');
 
@@ -597,6 +638,23 @@
     }
     function badgeFor(s) {
       return s.realId ? '<span class="badge real">' + escapeHtml(s.realId) + '</span>' : '<span class="badge temp">' + escapeHtml(s.tempId) + '</span>';
+    }
+    /** แสดงรหัสจริง + รหัสชั่วคราว คู่กันเสมอ (รหัสชั่วคราวมีตลอด ส่วนรหัสจริงโชว์เพิ่มถ้ามีแล้ว) */
+    function bothCodesFor(s) {
+      let html = '<span class="badge temp">ชั่วคราว: ' + escapeHtml(s.tempId) + '</span>';
+      if (s.realId) html += ' <span class="badge real">จริง: ' + escapeHtml(s.realId) + '</span>';
+      return html;
+    }
+    /** สรุปค่าฟิลด์เพิ่มเติมทั้งหมด (ไม่รวมไฟล์/รูป) เป็นข้อความเดียว เช่น "ชื่อ: สมชาย | เบอร์โทร: 0812345678" */
+    function formatCustomFieldsSummary(customFields) {
+      if (!customFields || !formFields.length) return '-';
+      const parts = [];
+      formFields.forEach(function (f) {
+        if (fieldIsFile(f)) return;
+        const val = customFields[f.id];
+        if (val) parts.push('<b>' + escapeHtml(f.label) + ':</b> ' + escapeHtml(val));
+      });
+      return parts.length ? parts.join(' &nbsp;|&nbsp; ') : '-';
     }
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
@@ -697,6 +755,8 @@
             document.getElementById('photoFilterWrap').style.display = 'none';
             document.getElementById('photoTeacherScopeHint').style.display = 'block';
             document.getElementById('photoTeacherScopeHint').textContent = 'แสดงเฉพาะห้องของคุณ: ' + scope.label;
+            document.getElementById('confirmFilterWrap').style.display = 'none';
+            document.getElementById('moveFilterWrap').style.display = 'none';
             updateTempIdPreview();
           })
           .withFailureHandler(function (err) { console.error('โหลดขอบเขตห้องครูไม่สำเร็จ', err); })
@@ -1114,7 +1174,7 @@
       list.forEach(function (s) {
         html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td>' + badgeFor(s) + '</td>' +
+          '<td style="font-size:11px;">' + bothCodesFor(s) + '</td>' +
           '</tr>';
       });
       html += '</table>';
@@ -1126,7 +1186,8 @@
       if (!s) return;
       const pane = document.getElementById('photoDetailPane');
       pane.innerHTML =
-        '<h3 style="margin:0 0 10px;">' + badgeFor(s) + ' &nbsp; ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</h3>' +
+        '<h3 style="margin:0 0 10px;">' + bothCodesFor(s) + ' &nbsp; ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</h3>' +
+        '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields) + '</p>' +
         (s.photoUrl ? '<img class="photo-preview" id="photoDetailPreview" src="' + s.photoUrl + '">' : '<div class="photo-preview" id="photoDetailPreview"></div>') +
         '<p class="hint">ชื่อไฟล์ที่ใช้อยู่ตอนนี้: ' + escapeHtml(s.photoFile || '(ยังไม่มีรูป)') + '</p>' +
         '<p class="hint">สถานะ: ' + statusBadge(s) + '</p>' +
@@ -1180,11 +1241,12 @@
       const container = document.getElementById('searchResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
       const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
-      let html = '<table><tr><th>รูป</th><th>รหัส</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
+      let html = '<table><tr><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
           '<td>' + statusBadge(s) + '</td>' +
           '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
           '<td>' +
@@ -1225,9 +1287,17 @@
       }
       renderCustomFieldInputs('editCustomFieldsWrap', formFields.filter(fieldIsInline), s.customFields);
       renderCustomFileFields('editCustomFileFieldsWrap', formFields, id, s.customFields);
-      document.getElementById('editFormCard').style.display = 'block';
-      document.getElementById('editFormCard').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('editFormCard').classList.add('active');
     }
+
+    function closeEditModal() {
+      document.getElementById('editFormCard').classList.remove('active');
+      currentEditId = null;
+    }
+    document.getElementById('btnCloseEditModal').addEventListener('click', closeEditModal);
+    document.getElementById('editFormCard').addEventListener('click', function (e) {
+      if (e.target === this) closeEditModal();
+    });
 
     document.getElementById('btnSaveTempId').addEventListener('click', function () {
       const newTempId = document.getElementById('editTempId').value.trim();
@@ -1259,8 +1329,8 @@
       google.script.run
         .withSuccessHandler(function () {
           btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
-          showMsg('editMsg', 'บันทึกสำเร็จ', 'success');
           document.getElementById('btnSearch').click();
+          closeEditModal();
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
@@ -1273,23 +1343,29 @@
     // TAB: จัดการข้อมูล > ยืนยันรหัสจริง (admin/teacher)
     // ===================================================================
     function loadConfirmList() {
+      const filter = {
+        onlyTemp: true,
+        grade: document.getElementById('confirmFilterGrade').value,
+        room: document.getElementById('confirmFilterRoom').value
+      };
       const container = document.getElementById('confirmList');
       container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
       google.script.run
         .withSuccessHandler(renderConfirmList)
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
-        .listStudents(TOKEN, { onlyTemp: true });
+        .listStudents(TOKEN, filter);
     }
     document.getElementById('btnRefreshConfirm').addEventListener('click', loadConfirmList);
 
     function renderConfirmList(list) {
       const container = document.getElementById('confirmList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีนักเรียนที่ใช้รหัสชั่วคราวอยู่ ✓</div>'; return; }
-      let html = '<table><tr><th>รูป</th><th>รหัสชั่วคราว</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>กรอกรหัสจริง</th></tr>';
+      let html = '<table><tr><th>รูป</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>กรอกรหัสจริง</th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
           '<td><span class="badge temp">' + escapeHtml(s.tempId) + '</span></td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
           '<td>' + statusBadge(s) + '</td>' +
           '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
           '<td class="inline-form"><input type="text" class="realIdInput" data-id="' + s.id + '" placeholder="รหัสนักเรียนจริง">' +
@@ -1318,23 +1394,28 @@
     // TAB: จัดการข้อมูล > ย้ายห้อง (admin: ทันที / teacher: แจ้งคำขอ)
     // ===================================================================
     document.getElementById('btnMoveSearch').addEventListener('click', function () {
-      const q = document.getElementById('moveSearch').value.trim();
+      const filter = {
+        query: document.getElementById('moveSearch').value.trim(),
+        grade: document.getElementById('moveFilterGrade').value,
+        room: document.getElementById('moveFilterRoom').value
+      };
       const container = document.getElementById('moveResults');
       container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
       google.script.run
         .withSuccessHandler(renderMoveResults)
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
-        .listStudents(TOKEN, { query: q });
+        .listStudents(TOKEN, filter);
     });
 
     function renderMoveResults(list) {
       const container = document.getElementById('moveResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table><tr><th>รูป</th><th>รหัส</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
+      let html = '<table><tr><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td>' + badgeFor(s) + '</td>' +
+          '<td>' + bothCodesFor(s) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
           '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
           '<td><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\', \'' +
             escapeJs(s.activeCode) + '\', \'' +
