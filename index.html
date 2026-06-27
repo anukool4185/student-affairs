@@ -132,8 +132,8 @@
     .modal-close:hover { color: var(--text); }
     @media print {
       body * { visibility: hidden; }
-      #publishReportTable, #publishReportTable * { visibility: visible; }
-      #publishReportTable { position: absolute; top: 0; left: 0; width: 100%; }
+      .print-target, .print-target * { visibility: visible; }
+      .print-target { position: absolute; top: 0; left: 0; width: 100%; }
     }
   </style>
 </head>
@@ -615,22 +615,30 @@
 
         <div class="card" id="coNotifyCard">
           <h2>🔔 รายการอัปเดตที่แอดมินส่งมาใหม่</h2>
-          <div class="hint">เมื่อดาวน์โหลดวันที่ใดไปแล้ว รายการนั้นจะหายไปจากหน้านี้ทันที (ดาวน์โหลดได้ใหม่อีกได้ที่แท็บค้นหาด้านล่างตามปกติ)</div>
+          <div class="hint">ติ๊กเลือกรายการที่ต้องการ แล้วกดดาวน์โหลดหรือพิมพ์ — รายการที่ดาวน์โหลดแล้วจะหายไปจากหน้านี้ทันที (ค้นหาและดาวน์โหลดซ้ำได้ปกติที่แท็บค้นรูปด้านล่าง)</div>
           <br>
-          <div style="display:flex; gap:18px; flex-wrap:wrap;">
-            <div style="flex:1 1 280px; min-width:240px;">
-              <h3 style="margin:0 0 8px;">📷 อัปเดตรูป / เปลี่ยนรหัสชั่วคราว-รหัสจริง</h3>
-              <div id="coNotifyPhotos" class="hint">กำลังโหลด...</div>
-            </div>
-            <div style="flex:1 1 280px; min-width:240px;">
-              <h3 style="margin:0 0 8px;">📄 อัปเดตข้อมูลอื่นๆ</h3>
-              <div id="coNotifyData" class="hint">กำลังโหลด...</div>
-            </div>
+          <h3 style="margin:0 0 8px;">📷 ตารางรายการอัปเดตรูป / เปลี่ยนรหัสชั่วคราว-รหัสจริง</h3>
+          <div class="inline-form">
+            <button class="btn small secondary" id="btnRefreshCoPhotos">รีเฟรชรายการ</button>
+            <button class="btn small secondary" id="btnDownloadCoPhotos">ดาวน์โหลดที่เลือก</button>
+            <button class="btn small secondary" id="btnPrintCoPhotos">🖨️ พิมพ์ที่เลือก</button>
           </div>
+          <div id="coNotifyPhotos" class="hint" style="margin-top:10px;">กำลังโหลด...</div>
+
+          <div class="divider"></div>
+          <h3 style="margin:0 0 8px;">📄 ตารางรายการอัปเดตข้อมูลอื่นๆ</h3>
+          <div class="inline-form">
+            <button class="btn small secondary" id="btnRefreshCoData">รีเฟรชรายการ</button>
+            <button class="btn small secondary" id="btnDownloadCoData">ดาวน์โหลดที่เลือก</button>
+            <button class="btn small secondary" id="btnPrintCoData">🖨️ พิมพ์ที่เลือก</button>
+          </div>
+          <div id="coNotifyData" class="hint" style="margin-top:10px;">กำลังโหลด...</div>
+          <div id="coNotifyMsg" style="margin-top:10px;"></div>
         </div>
 
         <div class="card">
-          <h2>ค้นหาข้อมูลและรูปภาพนักเรียน</h2>
+          <h2>ค้นรูปภาพนักเรียน</h2>
+          <div class="hint">ค้นหารูปทั้งหมดตามวันที่ที่เลือก แสดงผลในหน้านี้ เลือกได้ทีละรายการแล้วดาวน์โหลดรวมกัน</div>
           <div class="grid">
             <div><label>วันที่กิจกรรม (ไม่ระบุ = ทุกวันที่)</label><input type="date" id="coDate"></div>
             <div><label>ระดับชั้น</label><select id="coGrade"><option value="">ทั้งหมด</option></select></div>
@@ -2288,8 +2296,15 @@
       card.scrollIntoView({ behavior: 'smooth' });
     }
 
-    document.getElementById('btnPrintReport').addEventListener('click', function () {
+    function printElement(id) {
+      const el = document.getElementById(id);
+      el.classList.add('print-target');
       window.print();
+      setTimeout(function () { el.classList.remove('print-target'); }, 500);
+    }
+
+    document.getElementById('btnPrintReport').addEventListener('click', function () {
+      printElement('publishReportTable');
     });
 
     document.getElementById('btnExportReportCsv').addEventListener('click', function () {
@@ -2403,7 +2418,7 @@
     }
 
     // ===================================================================
-    // TAB: ดาวน์โหลดข้อมูล (company) — แจ้งเตือนอัปเดตที่ยังไม่ดาวน์โหลด
+    // TAB: ดาวน์โหลดข้อมูล (company) — แจ้งเตือนอัปเดตที่ยังไม่ดาวน์โหลด (ตารางเลือกได้ทีละแถว)
     // ===================================================================
     function loadCompanyNotifications() {
       const photoBox = document.getElementById('coNotifyPhotos');
@@ -2412,44 +2427,58 @@
       dataBox.innerHTML = 'กำลังโหลด...';
       google.script.run
         .withSuccessHandler(function (res) {
-          renderNotifyGroup(photoBox, res.photoUpdates, 'รูป');
-          renderNotifyGroup(dataBox, res.dataUpdates, 'ข้อมูล');
+          renderCoItemsTable(photoBox, res.photoItems, true);
+          renderCoItemsTable(dataBox, res.dataItems, false);
         })
         .withFailureHandler(function (err) {
           if (!handleAuthError(err)) { photoBox.innerHTML = dataBox.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; }
         })
-        .companyGetSendNotifications(TOKEN);
+        .companyGetPendingItems(TOKEN);
     }
 
-    function renderNotifyGroup(box, list, type) {
+    function renderCoItemsTable(box, list, showPath) {
       if (!list.length) { box.innerHTML = '<div class="empty">ไม่มีรายการใหม่</div>'; return; }
-      let html = '';
-      list.forEach(function (g) {
-        html += '<div class="inline-form" style="margin-bottom:6px;">' +
-          '<span>' + escapeHtml(g.date) + ' — <b>' + g.count + '</b> รายการ</span>' +
-          '<button class="btn small secondary" onclick="downloadNotifyBatch(\'' + escapeJs(type) + '\', \'' + escapeJs(g.date) + '\', this)">ดาวน์โหลด</button>' +
-          '</div>';
+      const chkClass = showPath ? 'coPhotoChk' : 'coDataChk';
+      const selectAllId = showPath ? 'coPhotoSelectAll' : 'coDataSelectAll';
+      let html = '<table><tr><th><input type="checkbox" id="' + selectAllId + '"></th><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th><th>วันที่ส่ง</th>' +
+        (showPath ? '<th>เส้นทาง</th>' : '') + '</tr>';
+      list.forEach(function (it) {
+        const fakeStudent = { realId: it.realId, tempId: it.tempId, customFields: it.customFields, phone: it.phone };
+        html += '<tr><td><input type="checkbox" class="' + chkClass + '" value="' + it.rowNum + '"></td>' +
+          '<td>' + (it.photoUrl ? '<img class="thumb" src="' + it.photoUrl + '">' : '-') + '</td>' +
+          '<td style="font-size:12px;">' + codesAndNameRow(fakeStudent) + '</td>' +
+          '<td>' + escapeHtml((it.grade || '') + (it.room ? ' / ' + it.room : '')) + '</td>' +
+          '<td>' + escapeHtml(it.date) + ' ' + escapeHtml(it.hour) + ':00</td>' +
+          (showPath ? '<td style="font-size:11px;">' + (it.photoPath ? escapeHtml(it.photoPath) : '<span class="hint">-</span>') + '</td>' : '') +
+          '</tr>';
       });
+      html += '</table>';
       box.innerHTML = html;
+      document.getElementById(selectAllId).addEventListener('change', function (e) {
+        document.querySelectorAll('.' + chkClass).forEach(function (c) { c.checked = e.target.checked; });
+      });
     }
 
-    function downloadNotifyBatch(type, dateStr, btnEl) {
-      btnEl.disabled = true; btnEl.textContent = 'กำลังเตรียมไฟล์...';
+    function downloadCoSelected(chkClass) {
+      const rows = Array.prototype.map.call(document.querySelectorAll('.' + chkClass + ':checked'), function (c) { return parseInt(c.value, 10); });
+      if (!rows.length) { showMsg('coNotifyMsg', 'กรุณาเลือกรายการที่ต้องการดาวน์โหลดอย่างน้อย 1 รายการ', 'error'); return; }
       google.script.run
         .withSuccessHandler(function (res) {
-          btnEl.disabled = false; btnEl.textContent = 'ดาวน์โหลด';
           const link = document.createElement('a');
           link.href = 'data:application/octet-stream;base64,' + res.base64;
           link.download = res.filename;
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
           loadCompanyNotifications();
         })
-        .withFailureHandler(function (err) {
-          btnEl.disabled = false; btnEl.textContent = 'ดาวน์โหลด';
-          alert('เกิดข้อผิดพลาด: ' + err.message);
-        })
-        .companyDownloadBatch(TOKEN, type, dateStr);
+        .withFailureHandler(function (err) { showMsg('coNotifyMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+        .companyDownloadSelectedRows(TOKEN, rows);
     }
+    document.getElementById('btnDownloadCoPhotos').addEventListener('click', function () { downloadCoSelected('coPhotoChk'); });
+    document.getElementById('btnDownloadCoData').addEventListener('click', function () { downloadCoSelected('coDataChk'); });
+    document.getElementById('btnRefreshCoPhotos').addEventListener('click', loadCompanyNotifications);
+    document.getElementById('btnRefreshCoData').addEventListener('click', loadCompanyNotifications);
+    document.getElementById('btnPrintCoPhotos').addEventListener('click', function () { printElement('coNotifyPhotos'); });
+    document.getElementById('btnPrintCoData').addEventListener('click', function () { printElement('coNotifyData'); });
 
     document.getElementById('btnCoSearch').addEventListener('click', function () {
       const container = document.getElementById('coResults');
