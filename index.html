@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -25,7 +27,7 @@
     header { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
     header .title h1 { margin: 0; font-size: 19px; font-weight: 600; }
     header .title p { margin: 2px 0 0; font-size: 12.5px; opacity: 0.9; }
-    header .userbox { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    header .userbox { display: flex; align-items: center; gap: 10px; font-size: 13px; flex-wrap: wrap; justify-content: flex-end; }
     header .userbox button { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: 'Sarabun', sans-serif; font-size: 13px; }
     header .userbox button:hover { background: rgba(255,255,255,0.3); }
 
@@ -48,7 +50,7 @@
 
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
     label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
-    input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Sarabun', sans-serif; font-size: 14px; background: #fff; }
+    input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Sarabun', sans-serif; font-size: 16px; background: #fff; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
     textarea { resize: vertical; min-height: 70px; }
 
@@ -62,6 +64,8 @@
     button.btn.full { width: 100%; }
 
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+    .table-scroll table { min-width: 480px; }
     th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
     th { color: var(--text-muted); font-weight: 600; font-size: 12px; }
     .thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #e2e8f0; display: block; }
@@ -1091,7 +1095,7 @@
     function renderFormFieldsList(fields) {
       const container = document.getElementById('ffList');
       if (!fields.length) { container.innerHTML = '<div class="empty">ยังไม่มีช่องข้อมูลเพิ่มเติม</div>'; return; }
-      let html = '<table><tr><th>ลำดับ</th><th></th><th>ชื่อช่อง</th><th>ประเภท</th><th>ตัวเลือก</th><th></th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>ลำดับ</th><th></th><th>ชื่อช่อง</th><th>ประเภท</th><th>ตัวเลือก</th><th></th></tr>';
       fields.forEach(function (f, idx) {
         const upDisabled = (idx === 0) ? 'disabled' : '';
         const downDisabled = (idx === fields.length - 1) ? 'disabled' : '';
@@ -1110,7 +1114,7 @@
           '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1369,14 +1373,14 @@
       photoListCache = list;
       const container = document.getElementById('photoStudentList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
       list.forEach(function (s) {
         html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
           '<td style="font-size:11px;">' + codesAndNameRow(s) + '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1444,7 +1448,7 @@
       const container = document.getElementById('searchResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
       const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
-      let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
@@ -1457,7 +1461,7 @@
           '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1622,7 +1626,7 @@
     function renderConfirmList(list) {
       const container = document.getElementById('confirmList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>รหัสจริง (ลบให้ว่างเพื่อยกเลิก)</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>รหัสจริง (ลบให้ว่างเพื่อยกเลิก)</th></tr>';
       list.forEach(function (s) {
         const confirmedClass = s.realId ? ' confirmed-input' : '';
         html += '<tr>' +
@@ -1634,7 +1638,7 @@
           '<button class="btn small" onclick="confirmReal(\'' + escapeJs(s.id) + '\', this)">บันทึก</button></td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1672,7 +1676,7 @@
     function renderMoveResults(list) {
       const container = document.getElementById('moveResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
@@ -1683,7 +1687,7 @@
             escapeJs(s.grade) + '\', \'' + escapeJs(s.room) + '\')">เลือกย้าย</button></td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1759,13 +1763,13 @@
           promoteListCache = list;
           if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบนักเรียนในห้องนี้</div>'; return; }
           let html = '<div class="inline-form" style="margin-bottom:8px;"><label><input type="checkbox" id="promoteSelectAll"> เลือกทั้งหมด</label></div>';
-          html += '<table><tr><th></th><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
+          html += '<div class="table-scroll"><table><tr><th></th><th>รูป</th><th>รหัส / ชื่อ</th></tr>';
           list.forEach(function (s) {
             html += '<tr><td><input type="checkbox" class="promoteChk" value="' + s.id + '"></td>' +
               '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
               '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td></tr>';
           });
-          html += '</table>';
+          html += '</table></div>';
           container.innerHTML = html;
           document.getElementById('promoteSelectAll').addEventListener('change', function (e) {
             document.querySelectorAll('.promoteChk').forEach(function (c) { c.checked = e.target.checked; });
@@ -1909,7 +1913,7 @@
     function renderRequestsList(list) {
       const container = document.getElementById('requestsList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีคำขอที่รออนุมัติ</div>'; return; }
-      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>ข้อความตอบกลับ</th><th>ดำเนินการ</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>ข้อความตอบกลับ</th><th>ดำเนินการ</th></tr>';
       list.forEach(function (r) {
         const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
         html += '<tr>' +
@@ -1925,7 +1929,7 @@
           '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1961,7 +1965,7 @@
     function renderMyRequestsList(list) {
       const container = document.getElementById('myRequestsList');
       if (!list.length) { container.innerHTML = '<div class="empty">คุณยังไม่ได้ส่งคำขอใดๆ</div>'; return; }
-      let html = '<table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>วันที่ขอ</th><th>สถานะ</th><th>ข้อความตอบกลับจากแอดมิน</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>ประเภท</th><th>นักเรียน</th><th>รายละเอียด</th><th>วันที่ขอ</th><th>สถานะ</th><th>ข้อความตอบกลับจากแอดมิน</th></tr>';
       list.forEach(function (r) {
         const detailTxt = r.type === 'ย้ายห้อง' && r.details ? ('ไป ' + r.details.newGrade + ' / ห้อง ' + r.details.newRoom) : '-';
         html += '<tr>' +
@@ -1973,7 +1977,7 @@
           '<td>' + (r.replyMessage ? escapeHtml(r.replyMessage) : '<span class="hint">-</span>') + '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
     }
 
@@ -1986,13 +1990,13 @@
       google.script.run
         .withSuccessHandler(function (list) {
           if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีข้อมูลที่อัปเดตใหม่</div>'; return; }
-          let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
+          let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
           list.forEach(function (s) {
             html += '<tr><td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
               '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
               '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td></tr>';
           });
-          html += '</table>';
+          html += '</table></div>';
           container.innerHTML = html;
         })
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
@@ -2018,7 +2022,7 @@
     function renderPendingList(list) {
       const container = document.getElementById('pendingList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีรูปที่รอเผยแพร่</div>'; return; }
-      let html = '<table><tr><th><input type="checkbox" id="pendingSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th><input type="checkbox" id="pendingSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td><input type="checkbox" class="pendingChk" value="' + s.id + '"></td>' +
@@ -2028,7 +2032,7 @@
           '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
       document.getElementById('pendingSelectAll').addEventListener('change', function (e) {
         document.querySelectorAll('.pendingChk').forEach(function (c) { c.checked = e.target.checked; });
@@ -2063,7 +2067,7 @@
       const container = document.getElementById('publishReportTable');
       if (!res.items.length) { card.style.display = 'none'; return; }
       let html = '<p><b>วันที่ส่งข้อมูล:</b> ' + escapeHtml(res.date) + ' &nbsp; <b>เวลา:</b> ' + escapeHtml(res.hour) + ':00 น. &nbsp; <b>จำนวน:</b> ' + res.items.length + ' รายการ</p>';
-      html += '<table><tr><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>ตำแหน่งโฟลเดอร์ใหม่</th><th>ชื่อไฟล์</th></tr>';
+      html += '<div class="table-scroll"><table><tr><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>ตำแหน่งโฟลเดอร์ใหม่</th><th>ชื่อไฟล์</th></tr>';
       res.items.forEach(function (it) {
         html += '<tr>' +
           '<td>' + escapeHtml(it.realId || '-') + '</td>' +
@@ -2074,7 +2078,7 @@
           '<td>' + escapeHtml(it.photoFile) + '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
       card.style.display = 'block';
       card.scrollIntoView({ behavior: 'smooth' });
@@ -2187,7 +2191,7 @@
     function renderCoResults(list) {
       const container = document.getElementById('coResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการตามเงื่อนไข</div>'; return; }
-      let html = '<table><tr><th><input type="checkbox" id="coSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ชั้น/ห้อง</th><th>วันที่</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th><input type="checkbox" id="coSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ชั้น/ห้อง</th><th>วันที่</th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td><input type="checkbox" class="coChk" value="' + s.id + '"></td>' +
@@ -2197,7 +2201,7 @@
           '<td>' + escapeHtml(s.photoDate || '-') + '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       container.innerHTML = html;
       document.getElementById('coSelectAll').addEventListener('change', function (e) {
         document.querySelectorAll('.coChk').forEach(function (c) { c.checked = e.target.checked; });
@@ -2269,7 +2273,7 @@
 
     function renderAdminUsers(list) {
       const box = document.getElementById('adminUsersList');
-      let html = '<table><tr><th>บทบาท</th><th>Username</th><th>Username ใหม่</th><th>รหัสผ่านใหม่</th><th></th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>บทบาท</th><th>Username</th><th>Username ใหม่</th><th>รหัสผ่านใหม่</th><th></th></tr>';
       list.forEach(function (u) {
         html += '<tr>' +
           '<td><span class="badge role">' + escapeHtml(ROLE_THAI[u.role] || u.role) + '</span></td>' +
@@ -2282,7 +2286,7 @@
           '</td>' +
           '</tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       box.innerHTML = html;
     }
 
@@ -2364,11 +2368,11 @@
 
           const resultBox = document.getElementById('bulkResultList');
           if (res.created.length) {
-            let html = '<table><tr><th>Username</th><th>Password</th></tr>';
+            let html = '<div class="table-scroll"><table><tr><th>Username</th><th>Password</th></tr>';
             res.created.forEach(function (u) {
               html += '<tr><td><b>' + escapeHtml(u.username) + '</b></td><td>' + escapeHtml(u.password) + '</td></tr>';
             });
-            html += '</table>';
+            html += '</table></div>';
             resultBox.innerHTML = html;
           }
           loadAccountTab();
@@ -2414,11 +2418,11 @@
       google.script.run
         .withSuccessHandler(function (list) {
           if (!list.length) { box.innerHTML = '<div class="empty">ไม่พบรายการที่ลงทะเบียนไว้</div>'; return; }
-          let html = '<table><tr><th>ชื่อ</th><th>นามสกุล</th><th>ชั้น/ห้อง</th></tr>';
+          let html = '<div class="table-scroll"><table><tr><th>ชื่อ</th><th>นามสกุล</th><th>ชั้น/ห้อง</th></tr>';
           list.forEach(function (r) {
             html += '<tr><td>' + escapeHtml(r.name) + '</td><td>' + escapeHtml(r.lastName) + '</td><td>' + escapeHtml(r.grade + ' / ' + r.room) + '</td></tr>';
           });
-          html += '</table>';
+          html += '</table></div>';
           box.innerHTML = html;
         })
         .withFailureHandler(function (err) { box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
@@ -2460,13 +2464,13 @@
       google.script.run
         .withSuccessHandler(function (list) {
           if (!list.length) { box.innerHTML = '<div class="empty">ไม่มีข้อมูลใหม่</div>'; return; }
-          let html = '<table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
+          let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
           list.forEach(function (s) {
             html += '<tr><td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
               '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
               '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td></tr>';
           });
-          html += '</table>';
+          html += '</table></div>';
           box.innerHTML = html;
         })
         .withFailureHandler(function (err) { box.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
