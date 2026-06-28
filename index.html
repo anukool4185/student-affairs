@@ -580,8 +580,8 @@
           <div class="inline-form">
             <button class="btn secondary small" id="btnRefreshSendHistory">รีเฟรชรายการ</button>
             <button class="btn small secondary" id="btnViewSelectedHistory">ดูรายละเอียดที่เลือก</button>
-            <button class="btn small secondary" id="btnDownloadSelectedHistory">ดาวน์โหลดที่เลือก</button>
-            <button class="btn small secondary" id="btnPrintSelectedHistory">🖨️ พิมพ์ที่เลือก</button>
+            <button class="btn small secondary" id="btnDownloadSelectedHistory">📊 ดาวน์โหลด Excel (CSV)</button>
+            <button class="btn small secondary" id="btnPrintSelectedHistory">🖨️ พิมพ์ที่เลือก / บันทึกเป็น PDF</button>
             <button class="btn small danger" id="btnDeleteSelectedHistory">ลบที่เลือก</button>
             <button class="btn small danger" id="btnDeleteAllHistory">ลบทั้งหมด</button>
           </div>
@@ -626,25 +626,31 @@
 
         <div class="card" id="coNotifyCard">
           <h2>🔔 รายการอัปเดตที่แอดมินส่งมาใหม่</h2>
-          <div class="hint">ติ๊กเลือกรายการที่ต้องการ แล้วกดดาวน์โหลดหรือพิมพ์ — รายการที่ดาวน์โหลดแล้วจะหายไปจากหน้านี้ทันที (ค้นหาและดาวน์โหลดซ้ำได้ปกติที่แท็บค้นรูปด้านล่าง)</div>
+          <div class="hint">ติ๊กเลือกรายการที่ต้องการจากตารางใดก็ได้ (เลือกข้าม 2 ตารางได้) แล้วกด "ดูรายละเอียดที่เลือก" ด้านล่างเพื่อดาวน์โหลด Excel หรือพิมพ์/บันทึกเป็น PDF รวมกันในหน้าเดียว</div>
           <br>
           <h3 style="margin:0 0 8px;">📷 ตารางรายการอัปเดตรูป / เปลี่ยนรหัสชั่วคราว-รหัสจริง</h3>
-          <div class="inline-form">
-            <button class="btn small secondary" id="btnRefreshCoPhotos">รีเฟรชรายการ</button>
-            <button class="btn small secondary" id="btnDownloadCoPhotos">ดาวน์โหลดที่เลือก</button>
-            <button class="btn small secondary" id="btnPrintCoPhotos">🖨️ พิมพ์ที่เลือก</button>
-          </div>
+          <button class="btn small secondary" id="btnRefreshCoPhotos">รีเฟรชรายการ</button>
           <div id="coNotifyPhotos" class="hint" style="margin-top:10px;">กำลังโหลด...</div>
 
           <div class="divider"></div>
           <h3 style="margin:0 0 8px;">📄 ตารางรายการอัปเดตข้อมูลอื่นๆ</h3>
-          <div class="inline-form">
-            <button class="btn small secondary" id="btnRefreshCoData">รีเฟรชรายการ</button>
-            <button class="btn small secondary" id="btnDownloadCoData">ดาวน์โหลดที่เลือก</button>
-            <button class="btn small secondary" id="btnPrintCoData">🖨️ พิมพ์ที่เลือก</button>
-          </div>
+          <button class="btn small secondary" id="btnRefreshCoData">รีเฟรชรายการ</button>
           <div id="coNotifyData" class="hint" style="margin-top:10px;">กำลังโหลด...</div>
+
+          <div class="divider"></div>
+          <div class="inline-form">
+            <button class="btn secondary" id="btnViewSelectedCoNotify">ดูรายละเอียดที่เลือก</button>
+          </div>
           <div id="coNotifyMsg" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card" id="coNotifyDetailCard" style="display:none;">
+          <h2>รายละเอียดที่เลือก</h2>
+          <div class="hint">เรียงตามวันที่และเวลาที่อัปเดต</div>
+          <br>
+          <button class="btn secondary small" id="btnDownloadCoNotifyExcel">📊 ดาวน์โหลด Excel (CSV)</button>
+          <button class="btn secondary small" id="btnPrintCoNotify">🖨️ พิมพ์ที่เลือก / บันทึกเป็น PDF</button>
+          <div id="coNotifyDetailTable" style="margin-top:14px;"></div>
         </div>
 
         <div class="card">
@@ -2490,13 +2496,17 @@
     // ===================================================================
     // TAB: ดาวน์โหลดข้อมูล (company) — แจ้งเตือนอัปเดตที่ยังไม่ดาวน์โหลด (ตารางเลือกได้ทีละแถว)
     // ===================================================================
+    let coPhotoItemsCache = [], coDataItemsCache = [];
+
     function loadCompanyNotifications() {
       const photoBox = document.getElementById('coNotifyPhotos');
       const dataBox = document.getElementById('coNotifyData');
       photoBox.innerHTML = 'กำลังโหลด...';
       dataBox.innerHTML = 'กำลังโหลด...';
+      document.getElementById('coNotifyDetailCard').style.display = 'none';
       google.script.run
         .withSuccessHandler(function (res) {
+          coPhotoItemsCache = res.photoItems; coDataItemsCache = res.dataItems;
           renderCoItemsTable(photoBox, res.photoItems, true);
           renderCoItemsTable(dataBox, res.dataItems, false);
         })
@@ -2528,27 +2538,67 @@
         document.querySelectorAll('.' + chkClass).forEach(function (c) { c.checked = e.target.checked; });
       });
     }
+    document.getElementById('btnRefreshCoPhotos').addEventListener('click', loadCompanyNotifications);
+    document.getElementById('btnRefreshCoData').addEventListener('click', loadCompanyNotifications);
 
-    function downloadCoSelected(chkClass) {
-      const rows = Array.prototype.map.call(document.querySelectorAll('.' + chkClass + ':checked'), function (c) { return parseInt(c.value, 10); });
-      if (!rows.length) { showMsg('coNotifyMsg', 'กรุณาเลือกรายการที่ต้องการดาวน์โหลดอย่างน้อย 1 รายการ', 'error'); return; }
+    function getSelectedCoNotifyItems() {
+      const photoRows = Array.prototype.map.call(document.querySelectorAll('.coPhotoChk:checked'), function (c) { return parseInt(c.value, 10); });
+      const dataRows = Array.prototype.map.call(document.querySelectorAll('.coDataChk:checked'), function (c) { return parseInt(c.value, 10); });
+      const items = coPhotoItemsCache.filter(function (it) { return photoRows.indexOf(it.rowNum) !== -1; })
+        .concat(coDataItemsCache.filter(function (it) { return dataRows.indexOf(it.rowNum) !== -1; }));
+      items.sort(function (a, b) {
+        const ka = a.date + a.hour, kb = b.date + b.hour;
+        return ka < kb ? -1 : (ka > kb ? 1 : 0);
+      });
+      return items;
+    }
+
+    function populateCoNotifyDetail() {
+      const items = getSelectedCoNotifyItems();
+      if (!items.length) { showMsg('coNotifyMsg', 'กรุณาเลือกรายการที่ต้องการอย่างน้อย 1 รายการ', 'error'); return false; }
+      const container = document.getElementById('coNotifyDetailTable');
+      let html = '<table><tr><th>รูป</th><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>วันที่ส่ง</th><th>เส้นทาง</th></tr>';
+      items.forEach(function (it) {
+        html += '<tr>' +
+          '<td>' + (it.photoUrl ? '<img class="thumb" src="' + it.photoUrl + '">' : '-') + '</td>' +
+          '<td>' + escapeHtml(it.realId || '-') + '</td>' +
+          '<td>' + escapeHtml(it.tempId) + '</td>' +
+          '<td style="font-size:12px;">' + formatCustomFieldsSummary(it.customFields, it.phone) + '</td>' +
+          '<td>' + escapeHtml((it.grade || '') + (it.room ? ' / ' + it.room : '')) + '</td>' +
+          '<td>' + escapeHtml(it.date) + ' ' + escapeHtml(it.hour) + ':00</td>' +
+          '<td style="font-size:11px;">' + (it.photoPath ? escapeHtml(it.photoPath) : '<span class="hint">-</span>') + '</td>' +
+          '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+      document.getElementById('coNotifyDetailCard').style.display = 'block';
+      return true;
+    }
+
+    document.getElementById('btnViewSelectedCoNotify').addEventListener('click', function () {
+      if (populateCoNotifyDetail()) document.getElementById('coNotifyDetailCard').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('btnPrintCoNotify').addEventListener('click', function () {
+      if (populateCoNotifyDetail()) printElement('coNotifyDetailTable');
+    });
+
+    document.getElementById('btnDownloadCoNotifyExcel').addEventListener('click', function () {
+      const items = getSelectedCoNotifyItems();
+      if (!items.length) { showMsg('coNotifyMsg', 'กรุณาเลือกรายการที่ต้องการอย่างน้อย 1 รายการ', 'error'); return; }
+      const rowNums = items.map(function (it) { return it.rowNum; });
       google.script.run
         .withSuccessHandler(function (res) {
           const link = document.createElement('a');
           link.href = 'data:application/octet-stream;base64,' + res.base64;
           link.download = res.filename;
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
+          document.getElementById('coNotifyDetailCard').style.display = 'none';
           loadCompanyNotifications();
         })
         .withFailureHandler(function (err) { showMsg('coNotifyMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
-        .companyDownloadSelectedRows(TOKEN, rows);
-    }
-    document.getElementById('btnDownloadCoPhotos').addEventListener('click', function () { downloadCoSelected('coPhotoChk'); });
-    document.getElementById('btnDownloadCoData').addEventListener('click', function () { downloadCoSelected('coDataChk'); });
-    document.getElementById('btnRefreshCoPhotos').addEventListener('click', loadCompanyNotifications);
-    document.getElementById('btnRefreshCoData').addEventListener('click', loadCompanyNotifications);
-    document.getElementById('btnPrintCoPhotos').addEventListener('click', function () { printElement('coNotifyPhotos'); });
-    document.getElementById('btnPrintCoData').addEventListener('click', function () { printElement('coNotifyData'); });
+        .companyDownloadSelectedRows(TOKEN, rowNums);
+    });
 
     document.getElementById('btnCoSearch').addEventListener('click', function () {
       const container = document.getElementById('coResults');
