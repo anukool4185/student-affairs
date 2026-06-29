@@ -271,6 +271,25 @@
     </div>
   </div>
 
+  <!-- ============ POPUP: ย้ายห้องนักเรียน ============ -->
+  <div class="modal-overlay" id="moveFormCard">
+    <div class="modal-box">
+      <button class="modal-close" id="btnCloseMoveModal" type="button" title="ปิด">✕</button>
+      <h2 id="moveFormTitle">ย้ายห้องให้</h2>
+      <p style="font-size:15px;"><b id="moveStudentLabel"></b></p>
+      <div id="moveMsg"></div>
+      <p class="hint">ห้องปัจจุบัน: <b id="moveCurrentClass"></b></p>
+      <div class="divider"></div>
+      <div class="grid">
+        <div><label>ระดับชั้นใหม่</label><select id="moveNewGrade"></select></div>
+        <div><label>ห้องใหม่</label><select id="moveNewRoom"></select></div>
+      </div>
+      <div class="hint">ถ้ารูปเผยแพร่ไปแล้ว การย้ายห้องจะทำให้สถานะกลับเป็น "รอเผยแพร่" และจะถูกจัดเข้าตำแหน่งใหม่ตอนแอดมินกด "จัดการส่งข้อมูล" รอบถัดไป</div>
+      <br>
+      <button class="btn" id="btnConfirmMove">ยืนยันการย้ายห้อง</button>
+    </div>
+  </div>
+
   <!-- ============ MAIN APP ============ -->
   <div id="appScreen" style="display:none;">
     <header>
@@ -456,19 +475,6 @@
             <br>
             <button class="btn secondary small" id="btnMoveSearch">ค้นหา</button>
             <div id="moveResults" style="margin-top:14px;"></div>
-          </div>
-
-          <div class="card" id="moveFormCard" style="display:none;">
-            <h2 id="moveFormTitle">ย้ายห้องให้ <span id="moveStudentLabel"></span></h2>
-            <div id="moveMsg"></div>
-            <p class="hint">ห้องปัจจุบัน: <b id="moveCurrentClass"></b></p>
-            <div class="grid">
-              <div><label>ระดับชั้นใหม่</label><select id="moveNewGrade"></select></div>
-              <div><label>ห้องใหม่</label><select id="moveNewRoom"></select></div>
-            </div>
-            <div class="hint">ถ้ารูปเผยแพร่ไปแล้ว การย้ายห้องจะทำให้สถานะกลับเป็น "รอเผยแพร่" และจะถูกจัดเข้าตำแหน่งใหม่ตอนแอดมินกด "จัดการส่งข้อมูล" รอบถัดไป</div>
-            <br>
-            <button class="btn" id="btnConfirmMove">ยืนยันการย้ายห้อง</button>
           </div>
         </div>
 
@@ -799,6 +805,7 @@
     let MY_ID = sessionStorage.getItem('sps_id') || null;
 
     let currentMoveStudent = null;
+    let moveResultsCache = [];
     let currentEditId = null;
     let editingFieldId = null;
     let formFields = [];
@@ -1694,6 +1701,15 @@
       if (e.target === this) closeEditModal();
     });
 
+    function closeMoveModal() {
+      document.getElementById('moveFormCard').classList.remove('active');
+      currentMoveStudent = null;
+    }
+    document.getElementById('btnCloseMoveModal').addEventListener('click', closeMoveModal);
+    document.getElementById('moveFormCard').addEventListener('click', function (e) {
+      if (e.target === this) closeMoveModal();
+    });
+
     document.getElementById('btnSaveTempId').addEventListener('click', function () {
       const newTempId = document.getElementById('editTempId').value.trim();
       if (!newTempId) { showMsg('editMsg', 'กรุณากรอกรหัสชั่วคราว', 'error'); return; }
@@ -1801,6 +1817,7 @@
     });
 
     function renderMoveResults(list) {
+      moveResultsCache = list;
       const container = document.getElementById('moveResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
       let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
@@ -1809,24 +1826,23 @@
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
           '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
           '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
-          '<td><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\', \'' +
-            escapeJs(s.activeCode) + '\', \'' +
-            escapeJs(s.grade) + '\', \'' + escapeJs(s.room) + '\')">เลือกย้าย</button></td>' +
+          '<td><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\')">เลือกย้าย</button></td>' +
           '</tr>';
       });
       html += '</table></div>';
       container.innerHTML = html;
     }
 
-    function selectMoveStudent(id, label, grade, room) {
+    function selectMoveStudent(id) {
+      const s = moveResultsCache.filter(function (x) { return x.id === id; })[0];
+      if (!s) return;
+      const grade = s.grade, room = s.room;
       currentMoveStudent = { id: id, grade: grade, room: room };
-      document.getElementById('moveStudentLabel').textContent = label;
+      document.getElementById('moveStudentLabel').innerHTML = codesAndNameRow(s);
       document.getElementById('moveCurrentClass').textContent = grade + ' / ห้อง ' + room;
-      document.getElementById('moveFormTitle').innerHTML =
-        (ROLE === 'admin' ? 'ย้ายห้องให้ ' : 'แจ้งย้ายห้องให้ ') + '<span id="moveStudentLabel2">' + escapeHtml(label) + '</span>';
+      document.getElementById('moveFormTitle').textContent = (ROLE === 'admin' ? 'ย้ายห้องให้' : 'แจ้งย้ายห้องให้');
       document.getElementById('btnConfirmMove').textContent = (ROLE === 'admin') ? 'ยืนยันการย้ายห้อง' : 'แจ้งย้ายห้อง (รออนุมัติจากแอดมิน)';
-      document.getElementById('moveFormCard').style.display = 'block';
-      document.getElementById('moveFormCard').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('moveFormCard').classList.add('active');
     }
 
     document.getElementById('btnConfirmMove').addEventListener('click', function () {
