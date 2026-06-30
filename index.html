@@ -1101,6 +1101,7 @@
           if (tabs.length) switchTab(tabs[0]);
         });
       }
+      if (ROLE === 'company') { loadFormFieldsGlobal(); }
 
       if (ROLE === 'teacher') {
         google.script.run
@@ -2635,14 +2636,20 @@
       const items = getSelectedCoNotifyItems();
       if (!items.length) { showMsg('coNotifyMsg', 'กรุณาเลือกรายการที่ต้องการอย่างน้อย 1 รายการ', 'error'); return false; }
       const container = document.getElementById('coNotifyDetailTable');
-      let html = '<table><tr><th>รูป</th><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th>วันที่ส่ง</th><th>เส้นทาง</th></tr>';
+      const inlineFields = formFields.filter(function (f) { return !fieldIsFile(f); });
+      let html = '<table><tr><th>รูป</th><th>รหัสจริง</th><th>รหัสชั่วคราว</th><th>เบอร์โทร</th>';
+      inlineFields.forEach(function (f) { html += '<th>' + escapeHtml(f.label) + '</th>'; });
+      html += '<th>ชั้น/ห้อง</th><th>วันที่ส่ง</th><th>เส้นทางโฟลเดอร์</th></tr>';
       items.forEach(function (it) {
         html += '<tr>' +
           '<td>' + (it.photoUrl ? '<img class="thumb" src="' + it.photoUrl + '">' : '-') + '</td>' +
           '<td>' + escapeHtml(it.realId || '-') + '</td>' +
           '<td>' + escapeHtml(it.tempId) + '</td>' +
-          '<td style="font-size:12px;">' + formatCustomFieldsSummary(it.customFields, it.phone) + '</td>' +
-          '<td>' + escapeHtml((it.grade || '') + (it.room ? ' / ' + it.room : '')) + '</td>' +
+          '<td>' + escapeHtml(it.phone || '-') + '</td>';
+        inlineFields.forEach(function (f) {
+          html += '<td>' + escapeHtml((it.customFields && it.customFields[f.id]) || '-') + '</td>';
+        });
+        html += '<td>' + escapeHtml((it.grade || '') + (it.room ? ' / ' + it.room : '')) + '</td>' +
           '<td>' + escapeHtml(it.date) + ' ' + escapeHtml(it.hour) + ':00</td>' +
           '<td style="font-size:11px;">' + (it.photoPath ? escapeHtml(it.photoPath) : '<span class="hint">-</span>') + '</td>' +
           '</tr>';
