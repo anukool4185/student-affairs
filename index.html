@@ -102,6 +102,11 @@
     .inline-form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .inline-form input { width: 140px; }
     .photo-preview { width: 110px; height: 110px; border-radius: 10px; object-fit: cover; background: #e2e8f0; display: block; margin-bottom: 10px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+    .photo-grid-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; background: var(--card); }
+    .photo-grid-item img.grid-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #e2e8f0; display: block; }
+    .photo-grid-item .grid-caption { font-size: 12px; margin-top: 8px; line-height: 1.5; text-align: left; }
+    .photo-grid-item .grid-checkbox-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; justify-content: flex-start; }
     .divider { border-top: 1px solid var(--border); margin: 18px 0; }
     .cf-field { margin-bottom: 10px; }
     .modal-overlay {
@@ -660,7 +665,7 @@
         </div>
 
         <div class="card">
-          <h2>ค้นรูปภาพนักเรียน</h2>
+          <h2>ค้นหาข้อมูลและภาพย้อนหลัง</h2>
           <div class="hint">ค้นหารูปทั้งหมดตามวันที่ที่เลือก แสดงผลในหน้านี้ เลือกได้ทีละรายการแล้วดาวน์โหลดรวมกัน</div>
           <div class="grid">
             <div><label>วันที่กิจกรรม (ไม่ระบุ = ทุกวันที่)</label><input type="date" id="coDate"></div>
@@ -2664,17 +2669,23 @@
     function renderCoResults(list) {
       const container = document.getElementById('coResults');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการตามเงื่อนไข</div>'; return; }
-      let html = '<div class="table-scroll"><table><tr><th><input type="checkbox" id="coSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ชั้น/ห้อง</th><th>วันที่</th></tr>';
+      const nameVal = function (s) { return guessFieldByLabel_(s.customFields, 'ชื่อ'); };
+      const lastNameVal = function (s) { return guessFieldByLabel_(s.customFields, 'นามสกุล'); };
+      let html = '<div class="inline-form" style="margin-bottom:10px;"><label><input type="checkbox" id="coSelectAll"> เลือกทั้งหมด</label></div>';
+      html += '<div class="photo-grid">';
       list.forEach(function (s) {
-        html += '<tr>' +
-          '<td><input type="checkbox" class="coChk" value="' + s.id + '"></td>' +
-          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td>' + bothCodesFor(s) + '</td>' +
-          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
-          '<td>' + escapeHtml(s.photoDate || '-') + '</td>' +
-          '</tr>';
+        const name = nameVal(s), lastName = lastNameVal(s);
+        html += '<div class="photo-grid-item">' +
+          '<div class="grid-checkbox-row"><input type="checkbox" class="coChk" value="' + s.id + '"> <span class="hint">เลือก</span></div>' +
+          (s.photoUrl ? '<img class="grid-thumb" src="' + s.photoUrl + '">' : '<div class="grid-thumb"></div>') +
+          '<div class="grid-caption">' +
+          bothCodesFor(s) + '<br>' +
+          ((name || lastName) ? ('<b>' + escapeHtml((name + ' ' + lastName).trim()) + '</b><br>') : '') +
+          escapeHtml(s.grade + ' / ห้อง ' + s.room) +
+          (s.photoDate ? ('<br><span class="hint">' + escapeHtml(s.photoDate) + '</span>') : '') +
+          '</div></div>';
       });
-      html += '</table></div>';
+      html += '</div>';
       container.innerHTML = html;
       document.getElementById('coSelectAll').addEventListener('change', function (e) {
         document.querySelectorAll('.coChk').forEach(function (c) { c.checked = e.target.checked; });
