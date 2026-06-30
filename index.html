@@ -901,6 +901,12 @@
     loadBellCounts();
     setInterval(loadBellCounts, 60000); // รีเฟรชจำนวนกระดิ่งทุก 1 นาที
 
+    // กันมือถือบางรุ่นค้างหน้าเดิม (จาก bfcache) หลังสลับไปแอปกล้องแล้วกลับมา —
+    // ถ้าเบราว์เซอร์คืนหน้าแบบ persisted (ไม่ได้โหลดใหม่จริง) ให้รีเฟรชจำนวนกระดิ่งเพื่อ "ปลุก" หน้าให้ตอบสนองอีกครั้ง
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) { loadBellCounts(); }
+    });
+
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
       if (placeholder) { const o = document.createElement('option'); o.value = ''; o.textContent = placeholder; select.appendChild(o); }
@@ -965,10 +971,31 @@
       return String(str || '').replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
     }
     function escapeJs(str) { return String(str || '').replace(/'/g, "\\'"); }
-    function fileToBase64(file, cb) {
+    function fileToBase64(file, cb, onError) {
       const reader = new FileReader();
-      reader.onload = function () { cb(reader.result.split(',')[1]); };
-      reader.readAsDataURL(file);
+      let settled = false;
+      const timeoutId = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        if (onError) onError(new Error('การอ่านไฟล์รูปใช้เวลานานเกินไป (ไฟล์อาจใหญ่เกินไป หรือเบราว์เซอร์มีปัญหา) กรุณาลองใหม่อีกครั้ง'));
+      }, 30000);
+      reader.onload = function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        cb(reader.result.split(',')[1]);
+      };
+      reader.onerror = function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        if (onError) onError(reader.error || new Error('ไม่สามารถอ่านไฟล์รูปได้'));
+      };
+      try {
+        reader.readAsDataURL(file);
+      } catch (e) {
+        if (!settled) { settled = true; clearTimeout(timeoutId); if (onError) onError(e); }
+      }
     }
 
     // ---------------------------------------------------------------
@@ -1205,6 +1232,9 @@
             if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
           })
           .uploadCustomFieldFile(TOKEN, studentId, fieldId, base64, file.type, file.name);
+      }, function (err) {
+        btnEl.disabled = false; btnEl.textContent = 'อัปโหลด';
+        alert('เกิดข้อผิดพลาด: ' + err.message);
       });
     }
 
@@ -1417,7 +1447,7 @@
         fileToBase64(file, function (base64) {
           google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
             .adminAddAnnouncement(TOKEN, text, base64, file.type, file.name);
-        });
+        }, onFail);
       } else {
         google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail)
           .adminAddAnnouncement(TOKEN, text, null, null, null);
@@ -1557,6 +1587,9 @@
               if (!handleAuthError(err)) showMsg('photoDetailMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
             })
             .uploadPhotoForStudent(TOKEN, id, base64, file.type, file.name);
+        }, function (err) {
+          btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
+          showMsg('photoDetailMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         });
       });
     }
@@ -1670,6 +1703,9 @@
             if (!handleAuthError(err)) showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
           })
           .uploadPhotoForStudent(TOKEN, currentEditId, base64, file.type, file.name);
+      }, function (err) {
+        btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
+        showMsg('editMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
       });
     });
 
