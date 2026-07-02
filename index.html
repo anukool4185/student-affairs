@@ -357,7 +357,6 @@
 
         <div class="card">
           <h2>ช่องข้อมูลที่มีอยู่</h2>
-          <button class="btn secondary small" id="btnRefreshFields">รีเฟรชรายการ</button>
           <div id="ffList" style="margin-top:14px;"></div>
         </div>
       </section>
@@ -379,7 +378,6 @@
 
         <div class="card">
           <h2>ประกาศที่มีอยู่</h2>
-          <button class="btn secondary small" id="btnRefreshAnnouncements">รีเฟรชรายการ</button>
           <div id="announcementsAdminList" style="margin-top:14px;"></div>
         </div>
       </section>
@@ -525,7 +523,6 @@
       <section class="panel" id="panel-messages">
         <div class="card">
           <h2>ยังไม่ได้จัดการ</h2>
-          <button class="btn secondary small" id="btnRefreshRequests">รีเฟรชรายการ</button>
           <div id="requestsMsg" style="margin-top:10px;"></div>
           <div id="requestsList" style="margin-top:14px;"></div>
         </div>
@@ -533,7 +530,6 @@
         <div class="card">
           <h2>จัดการแล้ว</h2>
           <div class="inline-form">
-            <button class="btn secondary small" id="btnRefreshHandled">รีเฟรชรายการ</button>
             <button class="btn small danger" id="btnDeleteSelectedHandled">ลบที่เลือก</button>
             <button class="btn small danger" id="btnDeleteAllHandled">ลบทั้งหมด</button>
           </div>
@@ -554,7 +550,6 @@
         </div>
         <div class="card">
           <h2>คำขอที่ฉันส่งไป (ย้ายห้อง / ลบ / ข้อความ)</h2>
-          <button class="btn secondary small" id="btnRefreshMyRequests">รีเฟรชรายการ</button>
           <div id="myRequestsList" style="margin-top:14px;"></div>
         </div>
       </section>
@@ -565,7 +560,6 @@
           <h2>รูปที่รออยู่ในโฟลเดอร์ชั่วคราว (รอเผยแพร่)</h2>
           <div class="hint">เลือกรายการที่ต้องการเผยแพร่ ระบุวันที่ส่งข้อมูล (ค่าเริ่มต้น = วันนี้) แล้วกด "เผยแพร่" — ระบบจะจัดเก็บตามโครงสร้าง วันที่ / ชั่วโมงที่ส่ง / ระดับชั้น / ห้อง โดยอัตโนมัติ</div>
           <br>
-          <button class="btn secondary small" id="btnRefreshPending">รีเฟรชรายการ</button>
           <div id="pendingMsg" style="margin-top:10px;"></div>
           <div id="pendingList" style="margin-top:14px;"></div>
         </div>
@@ -995,6 +989,25 @@
           .withFailureHandler(function () { _pollBusy = false; })
           .listPendingPhotos(TOKEN, { grade: pg, room: pr });
 
+      } else if (pid === 'panel-publish') {
+        // โหลด pending + data-updates แบบเงียบ (ไม่ re-render ถ้ายังไม่มีตาราง)
+        google.script.run
+          .withSuccessHandler(function (list) { _pollBusy = false; if (document.querySelector('#pendingList table')) renderPendingList(list); })
+          .withFailureHandler(function () { _pollBusy = false; })
+          .listPendingPhotos(TOKEN, {});
+
+      } else if (pid === 'panel-messages') {
+        google.script.run
+          .withSuccessHandler(function () { _pollBusy = false; loadRequestsList(); })
+          .withFailureHandler(function () { _pollBusy = false; })
+          .getNotificationCounts();  // lightweight ping — แค่เช็คว่ามีอะไรใหม่
+
+      } else if (pid === 'panel-myRequests') {
+        google.script.run
+          .withSuccessHandler(function () { _pollBusy = false; loadMyRequestsList(); })
+          .withFailureHandler(function () { _pollBusy = false; })
+          .getNotificationCounts();
+
       } else { _pollBusy = false; }
     }
 
@@ -1348,7 +1361,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .getFormFields(TOKEN);
     }
-    document.getElementById('btnRefreshFields').addEventListener('click', loadFormFieldsList);
 
     function renderFormFieldsList(fields) {
       const container = document.getElementById('ffList');
@@ -1456,7 +1468,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .getAnnouncements();
     }
-    document.getElementById('btnRefreshAnnouncements').addEventListener('click', loadAnnouncementsAdminList);
 
     function renderAnnouncementsAdminList(list) {
       const container = document.getElementById('announcementsAdminList');
@@ -2189,7 +2200,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .adminListRequests(TOKEN);
     }
-    document.getElementById('btnRefreshRequests').addEventListener('click', loadRequestsList);
 
     function loadHandledList() {
       const container = document.getElementById('handledList');
@@ -2201,7 +2211,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .adminListAllRequests(TOKEN);
     }
-    document.getElementById('btnRefreshHandled').addEventListener('click', loadHandledList);
 
     function renderHandledList(list) {
       const container = document.getElementById('handledList');
@@ -2315,7 +2324,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .getMyRequests(TOKEN);
     }
-    document.getElementById('btnRefreshMyRequests').addEventListener('click', loadMyRequestsList);
 
     function renderMyRequestsList(list) {
       const container = document.getElementById('myRequestsList');
@@ -2544,7 +2552,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .listPendingPhotos(TOKEN);
     }
-    document.getElementById('btnRefreshPending').addEventListener('click', loadPendingList);
 
     function renderPendingList(list) {
       const container = document.getElementById('pendingList');
@@ -2721,7 +2728,7 @@
           btn.disabled = false; btn.textContent = 'ส่งข้อความ';
           showMsg('teacherMsgSendBox', 'ส่งข้อความถึงแอดมินแล้ว', 'success');
           document.getElementById('teacherMessageText').value = '';
-          document.getElementById('btnRefreshMyRequests').click();
+          loadMyRequestsList();
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'ส่งข้อความ';
