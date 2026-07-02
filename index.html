@@ -602,7 +602,8 @@
             <button class="btn small secondary" id="btnDownloadSelectedHistory">📊 ดาวน์โหลด Excel (CSV)</button>
             <button class="btn small secondary" id="btnPrintSelectedHistory">🖨️ พิมพ์ที่เลือก / บันทึกเป็น PDF</button>
             <button class="btn small secondary" id="btnResetSelectedHistory">รีเซ็ตที่เลือกเป็นรอดาวน์โหลด</button>
-            <button class="btn small danger" id="btnDeleteSelectedHistory">ลบที่เลือก</button>
+            <button class="btn small" id="btnDeleteAndRestoreSelectedHistory">ลบเพื่ออัพเดทใหม่</button>
+            <button class="btn small danger" id="btnDeleteSelectedHistory">ลบออกจากรายการ</button>
             <button class="btn small danger" id="btnDeleteAllHistory">ลบทั้งหมด</button>
           </div>
           <div id="sendHistoryMsg" style="margin-top:10px;"></div>
@@ -753,8 +754,7 @@
 
   <script>
     // ===================================================================
-    // 🔌 เชื่อมต่อกับ Apps Script ผ่าน fetch() (GitHub Pages version)
-    // ===================================================================
+    // 🔌 GitHub Pages shim — DO NOT EDIT THIS BLOCK
     const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
     async function callApi(action, args) {
       const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, args: args || [] }) });
@@ -770,8 +770,8 @@
         if (prop === 'withFailureHandler') return function (fn) { return createRunProxy_(successHandler, fn); };
         return function () {
           const args = Array.prototype.slice.call(arguments);
-          callApi(prop, args).then(function (result) { if (successHandler) successHandler(result); })
-            .catch(function (err) { if (failureHandler) failureHandler(err); else console.error(prop, err); });
+          callApi(prop, args).then(function (r) { if (successHandler) successHandler(r); })
+            .catch(function (e) { if (failureHandler) failureHandler(e); else console.error(prop, e); });
         };
       }});
     }
@@ -2304,8 +2304,9 @@
           '<td>' + escapeHtml(h.date) + ' ' + escapeHtml(h.hour) + ':00</td>' +
           '<td style="font-size:11px;">' + (h.photoPath ? escapeHtml(h.photoPath) : '<span class="hint">-</span>') + '</td>' +
           '<td>' + statusHtml + ' ' +
+            '<button class="btn small" onclick="deleteAndRestoreOne(' + h.rowNum + ')" title="ลบออกจากประวัติ แล้วย้อนกลับไปรออยู่ใน Queue เพื่อส่งใหม่">ลบเพื่ออัพเดทใหม่</button> ' +
             (h.downloadedAt ? '<button class="btn small secondary" onclick="resetOneSendHistory(' + h.rowNum + ')">รีเซ็ตเป็นรอดาวน์โหลด</button> ' : '') +
-            '<button class="btn small danger" onclick="deleteOneSendHistory(' + h.rowNum + ')">ลบ</button></td>' +
+            '<button class="btn small danger" onclick="deleteOneSendHistory(' + h.rowNum + ')" title="ลบออกจากประวัติเฉยๆ ไม่ย้อนกลับอะไร">ลบออกจากรายการ</button></td>' +
           '</tr>';
       });
       html += '</table>';
@@ -2316,13 +2317,20 @@
     }
 
     function deleteOneSendHistory(rowNum) {
-      if (!confirm('ยืนยันลบประวัติรายการนี้?\n\n⚠️ ถ้าบริษัทยังไม่ได้ดาวน์โหลด — รายการจะถูกย้อนกลับไปรอส่งใหม่ใน "รูปที่รอเผยแพร่" หรือ "ข้อมูลที่มีการอัปเดต" โดยอัตโนมัติ')) return;
+      if (!confirm('ยืนยัน "ลบออกจากรายการ"?\n\nลบออกจากประวัติเฉยๆ ไม่ย้อนกลับอะไรทั้งนั้น')) return;
       google.script.run
-        .withSuccessHandler(function () { loadSendHistory(); loadPendingList(); loadDataUpdatesList(); })
+        .withSuccessHandler(function () { loadSendHistory(); })
         .withFailureHandler(function (err) { alert('เกิดข้อผิดพลาด: ' + err.message); })
         .adminDeleteSendHistoryRow(TOKEN, rowNum);
     }
 
+    function deleteAndRestoreOne(rowNum) {
+      if (!confirm('ยืนยัน "ลบเพื่ออัพเดทใหม่"?\n\nรายการจะถูกลบออกจากประวัติ และย้อนกลับไปรอส่งใหม่ใน Queue (รูปที่รออยู่ / ข้อมูลที่มีการอัปเดต) เพื่อให้สามารถส่งให้บริษัทได้อีกครั้ง')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadSendHistory(); loadPendingList(); loadDataUpdatesList(); })
+        .withFailureHandler(function (err) { alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminDeleteAndRestoreSendHistoryRow(TOKEN, rowNum);
+    }
     function resetOneSendHistory(rowNum) {
       if (!confirm('ยืนยันรีเซ็ตรายการนี้กลับเป็น "รอบริษัทดาวน์โหลด"? รายการนี้จะกลับไปขึ้นแจ้งเตือนฝั่งบริษัทอีกครั้ง')) return;
       google.script.run
@@ -2333,12 +2341,22 @@
 
     document.getElementById('btnDeleteSelectedHistory').addEventListener('click', function () {
       const rows = Array.prototype.map.call(document.querySelectorAll('.historyChk:checked'), function (c) { return parseInt(c.value, 10); });
-      if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการลบ', 'error'); return; }
-      if (!confirm('ยืนยันลบ ' + rows.length + ' รายการที่เลือก?\n\n⚠️ รายการที่บริษัทยังไม่ดาวน์โหลดจะถูกย้อนกลับไปรอส่งใหม่โดยอัตโนมัติ')) return;
+      if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการ', 'error'); return; }
+      if (!confirm('ยืนยัน "ลบออกจากรายการ" ' + rows.length + ' รายการ?\n\nลบออกจากประวัติเฉยๆ ไม่ย้อนกลับอะไรทั้งนั้น')) return;
       google.script.run
-        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบสำเร็จ', 'success'); loadSendHistory(); loadPendingList(); loadDataUpdatesList(); })
+        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบออกจากรายการสำเร็จ', 'success'); loadSendHistory(); })
         .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
         .adminDeleteSendHistoryRows(TOKEN, rows);
+    });
+
+    document.getElementById('btnDeleteAndRestoreSelectedHistory').addEventListener('click', function () {
+      const rows = Array.prototype.map.call(document.querySelectorAll('.historyChk:checked'), function (c) { return parseInt(c.value, 10); });
+      if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการ', 'error'); return; }
+      if (!confirm('ยืนยัน "ลบเพื่ออัพเดทใหม่" ' + rows.length + ' รายการ?\n\nรายการจะถูกลบและย้อนกลับไปรอส่งใหม่ใน Queue เพื่อให้ส่งให้บริษัทได้อีกครั้ง')) return;
+      google.script.run
+        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบและย้อนกลับสำเร็จ', 'success'); loadSendHistory(); loadPendingList(); loadDataUpdatesList(); })
+        .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+        .adminDeleteAndRestoreSendHistoryRows(TOKEN, rows);
     });
 
     document.getElementById('btnResetSelectedHistory').addEventListener('click', function () {
