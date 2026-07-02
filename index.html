@@ -604,7 +604,6 @@
             <button class="btn small secondary" id="btnResetSelectedHistory">รีเซ็ตที่เลือกเป็นรอดาวน์โหลด</button>
             <button class="btn small" id="btnDeleteAndRestoreSelectedHistory">ลบเพื่ออัพเดทใหม่</button>
             <button class="btn small danger" id="btnDeleteSelectedHistory">ลบออกจากรายการ</button>
-            <button class="btn small danger" id="btnDeleteAllHistory">ลบทั้งหมด</button>
           </div>
           <div id="sendHistoryMsg" style="margin-top:10px;"></div>
           <div id="sendHistoryList" style="margin-top:14px;"></div>
@@ -754,25 +753,19 @@
 
   <script>
     // ===================================================================
-    // 🔌 GitHub Pages shim — DO NOT EDIT THIS BLOCK
     const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
     async function callApi(action, args) {
       const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, args: args || [] }) });
-      const text = await res.text();
-      let json;
+      const text = await res.text(); let json;
       try { json = JSON.parse(text); } catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง: ' + text.slice(0, 200)); }
       if (!json.success) throw new Error(json.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ');
       return json.data;
     }
-    function createRunProxy_(successHandler, failureHandler) {
-      return new Proxy({}, { get: function (target, prop) {
-        if (prop === 'withSuccessHandler') return function (fn) { return createRunProxy_(fn, failureHandler); };
-        if (prop === 'withFailureHandler') return function (fn) { return createRunProxy_(successHandler, fn); };
-        return function () {
-          const args = Array.prototype.slice.call(arguments);
-          callApi(prop, args).then(function (r) { if (successHandler) successHandler(r); })
-            .catch(function (e) { if (failureHandler) failureHandler(e); else console.error(prop, e); });
-        };
+    function createRunProxy_(s, f) {
+      return new Proxy({}, { get: function (t, p) {
+        if (p === 'withSuccessHandler') return function (fn) { return createRunProxy_(fn, f); };
+        if (p === 'withFailureHandler') return function (fn) { return createRunProxy_(s, fn); };
+        return function () { const a = Array.prototype.slice.call(arguments); callApi(p, a).then(function (r) { if (s) s(r); }).catch(function (e) { if (f) f(e); else console.error(p, e); }); };
       }});
     }
     window.google = { script: { run: createRunProxy_() } };
@@ -2304,9 +2297,9 @@
           '<td>' + escapeHtml(h.date) + ' ' + escapeHtml(h.hour) + ':00</td>' +
           '<td style="font-size:11px;">' + (h.photoPath ? escapeHtml(h.photoPath) : '<span class="hint">-</span>') + '</td>' +
           '<td>' + statusHtml + ' ' +
-            '<button class="btn small" onclick="deleteAndRestoreOne(' + h.rowNum + ')" title="ลบออกจากประวัติ แล้วย้อนกลับไปรออยู่ใน Queue เพื่อส่งใหม่">ลบเพื่ออัพเดทใหม่</button> ' +
-            (h.downloadedAt ? '<button class="btn small secondary" onclick="resetOneSendHistory(' + h.rowNum + ')">รีเซ็ตเป็นรอดาวน์โหลด</button> ' : '') +
-            '<button class="btn small danger" onclick="deleteOneSendHistory(' + h.rowNum + ')" title="ลบออกจากประวัติเฉยๆ ไม่ย้อนกลับอะไร">ลบออกจากรายการ</button></td>' +
+            '<button class="btn small" onclick="deleteAndRestoreOne(' + h.rowNum + ')" title="ลบและย้อนกลับไปรอส่งใหม่">อัพเดท</button> ' +
+            (h.downloadedAt ? '<button class="btn small secondary" onclick="resetOneSendHistory(' + h.rowNum + ')" title="รีเซ็ตให้บริษัทดาวน์โหลดได้อีกครั้ง">รีเซท</button> ' : '') +
+            '<button class="btn small danger" onclick="deleteOneSendHistory(' + h.rowNum + ')" title="ลบออกจากประวัติเฉยๆ">ลบรายการ</button></td>' +
           '</tr>';
       });
       html += '</table>';
@@ -2367,14 +2360,6 @@
         .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'รีเซ็ตสำเร็จ', 'success'); loadSendHistory(); })
         .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
         .adminResetSendHistoryRows(TOKEN, rows);
-    });
-
-    document.getElementById('btnDeleteAllHistory').addEventListener('click', function () {
-      if (!confirm('ยืนยันลบประวัติการส่งข้อมูลทั้งหมด? ทำแล้วกู้คืนไม่ได้')) return;
-      google.script.run
-        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบทั้งหมดสำเร็จ', 'success'); loadSendHistory(); })
-        .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
-        .adminDeleteAllSendHistory(TOKEN);
     });
 
     function getCheckedHistoryRows() {
