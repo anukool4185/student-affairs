@@ -231,6 +231,14 @@
     </div>
   </div>
 
+  <!-- ============ POPUP: จัดการรูปภาพบนมือถือ (แสดงเมื่อหน้าจอแคบ) ============ -->
+  <div class="modal-overlay" id="photoMobileModal">
+    <div class="modal-box">
+      <button class="modal-close" id="btnClosePhotoMobile" type="button" title="ปิด">✕</button>
+      <div id="photoMobileContent"></div>
+    </div>
+  </div>
+
   <!-- ============ POPUP: แก้ไขข้อมูลนักเรียน (ใช้ร่วมกันทั้งแท็บจัดการข้อมูล และแท็บจัดการรูปภาพ) ============ -->
   <!-- ย้ายมาไว้ระดับบนสุด (ไม่อยู่ใน .panel ใดๆ) เพราะ position:fixed จะไม่แสดงผลถ้า ancestor มี display:none -->
   <div class="modal-overlay" id="editFormCard">
@@ -745,55 +753,30 @@
 
   <script>
     // ===================================================================
-    // 🔌 เชื่อมต่อกับ Apps Script ผ่าน fetch() (เพราะไฟล์นี้ฝากไว้บน GitHub Pages
-    //    ไม่ได้รันอยู่ "ใน" Apps Script เหมือนไฟล์ Index.html ตัวต้นฉบับ)
-    //
-    //    Shim นี้สร้าง google.script.run จำลองขึ้นมาให้ใช้ syntax เดิมได้ทุกที่
-    //    (.withSuccessHandler().withFailureHandler().ชื่อฟังก์ชัน(args))
-    //    โดยเบื้องหลังจะยิง fetch() ไปคุยกับ Apps Script Web App จริงแทน
-    //    --> โค้ดส่วนที่เหลือทั้งหมดของไฟล์นี้ไม่ต้องแก้อะไรเลย ใช้ของเดิมได้ทุกบรรทัด
+    // 🔌 เชื่อมต่อกับ Apps Script ผ่าน fetch() (GitHub Pages version)
     // ===================================================================
-
-    // ⚙️ แก้ URL นี้เป็น Web App URL ของคุณ ถ้า Deploy ใหม่แล้วได้ลิงก์เปลี่ยน (ปกติไม่ควรเปลี่ยนถ้าใช้ "New version")
     const API_URL = 'https://script.google.com/macros/s/AKfycbwL068zVo9K9ogk0q4p4lIfW8NONibYCmPwHefFhsy6A0Ja80MedXiz9hPYAFi6fdFN/exec';
-
     async function callApi(action, args) {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain เพื่อเลี่ยง CORS preflight
-        body: JSON.stringify({ action: action, args: args || [] })
-      });
+      const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: action, args: args || [] }) });
       const text = await res.text();
       let json;
       try { json = JSON.parse(text); } catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง: ' + text.slice(0, 200)); }
       if (!json.success) throw new Error(json.error || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ');
       return json.data;
     }
-
     function createRunProxy_(successHandler, failureHandler) {
-      return new Proxy({}, {
-        get: function (target, prop) {
-          if (prop === 'withSuccessHandler') {
-            return function (fn) { return createRunProxy_(fn, failureHandler); };
-          }
-          if (prop === 'withFailureHandler') {
-            return function (fn) { return createRunProxy_(successHandler, fn); };
-          }
-          return function () {
-            const args = Array.prototype.slice.call(arguments);
-            callApi(prop, args)
-              .then(function (result) { if (successHandler) successHandler(result); })
-              .catch(function (err) { if (failureHandler) failureHandler(err); else console.error(prop, err); });
-          };
-        }
-      });
+      return new Proxy({}, { get: function (target, prop) {
+        if (prop === 'withSuccessHandler') return function (fn) { return createRunProxy_(fn, failureHandler); };
+        if (prop === 'withFailureHandler') return function (fn) { return createRunProxy_(successHandler, fn); };
+        return function () {
+          const args = Array.prototype.slice.call(arguments);
+          callApi(prop, args).then(function (result) { if (successHandler) successHandler(result); })
+            .catch(function (err) { if (failureHandler) failureHandler(err); else console.error(prop, err); });
+        };
+      }});
     }
-
     window.google = { script: { run: createRunProxy_() } };
     // ===================================================================
-    // ↑↑↑ จบส่วนเชื่อมต่อ API — โค้ดด้านล่างทั้งหมดเหมือนเดิมทุกบรรทัด ↓↓↓
-    // ===================================================================
-
     // ===================================================================
     // ⚙️ แก้รายชื่อ "ระดับชั้น" และ "ห้อง" ที่ต้องการให้เลือกได้ที่นี่
     // ===================================================================
@@ -1560,8 +1543,12 @@
     function selectPhotoStudent(id) {
       const s = photoListCache.filter(function (x) { return x.id === id; })[0];
       if (!s) return;
-      const pane = document.getElementById('photoDetailPane');
-      pane.innerHTML =
+      const isMobile = window.innerWidth < 768;
+      const targetEl = isMobile
+        ? document.getElementById('photoMobileContent')
+        : document.getElementById('photoDetailPane');
+
+      const html =
         '<p style="margin:0 0 10px;"><b>ชั้น/ห้อง:</b> ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</p>' +
         '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields, s.phone) + '</p>' +
         '<button class="btn small secondary" id="btnEditFromPhoto">📝 แก้ไขข้อมูล</button>' +
@@ -1573,7 +1560,15 @@
         '<br><br><button class="btn" id="btnPhotoDetailUpload">อัปโหลด/เปลี่ยนรูป</button>' +
         '<div id="photoDetailMsg"></div>';
 
-      document.getElementById('btnEditFromPhoto').addEventListener('click', function () { openEditWithData(s); });
+      targetEl.innerHTML = html;
+      if (isMobile) document.getElementById('photoMobileModal').classList.add('active');
+
+      const pane = document.getElementById('photoDetailPane');
+
+      document.getElementById('btnEditFromPhoto').addEventListener('click', function () {
+        if (isMobile) document.getElementById('photoMobileModal').classList.remove('active');
+        openEditWithData(s);
+      });
 
       document.getElementById('btnPhotoDetailUpload').addEventListener('click', function () {
         const fileInput = document.getElementById('photoDetailFile');
@@ -1587,7 +1582,11 @@
               btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
               showMsg('photoDetailMsg', 'อัปโหลดสำเร็จ (รอเผยแพร่) ชื่อไฟล์: ' + res.fileName, 'success');
               document.getElementById('photoDetailPreview').outerHTML = '<img class="photo-preview" id="photoDetailPreview" src="' + res.photoUrl + '">';
-              searchPhotoList();
+              // อัปเดต cache ทีละรายการ ไม่ต้อง refresh ทั้งหน้า
+              const cached = photoListCache.filter(function (x) { return x.id === id; })[0];
+              if (cached) { cached.photoUrl = res.photoUrl; cached.photoFile = res.fileName; cached.photoStatus = 'pending'; }
+              renderPhotoList(photoListCache);
+              if (isMobile) { setTimeout(closePhotoMobileModal, 1500); }
             })
             .withFailureHandler(function (err) {
               btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
@@ -1648,13 +1647,34 @@
       const fn = isAdmin ? 'deleteStudent' : 'teacherRequestDelete';
       google.script.run
         .withSuccessHandler(function () {
-          if (isAdmin) { refreshAllStudentLists(); }
+          if (isAdmin) { removeFromSearchCache(id); }
           else { btnEl.textContent = 'ส่งคำขอแล้ว ✓'; btnEl.disabled = true; }
         })
         .withFailureHandler(function (err) { if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message); })
         [fn](TOKEN, id);
     }
 
+    /** ลบ 1 รายการออกจาก cache แล้ว re-render เฉพาะส่วนที่เปลี่ยน (ไม่ load ทั้งหน้า) */
+    function removeFromSearchCache(id) {
+      lastSearchResults = lastSearchResults.filter(function (s) { return s.id !== id; });
+      renderSearchResults(lastSearchResults);
+    }
+    /** อัปเดตข้อมูล 1 รายการใน cache แล้ว re-render เฉพาะแถวนั้น */
+    function updateSearchCache(id, fields) {
+      lastSearchResults = lastSearchResults.map(function (s) {
+        if (s.id !== id) return s;
+        return Object.assign({}, s, fields);
+      });
+      renderSearchResults(lastSearchResults);
+      if (photoListCache.length) {
+        photoListCache = photoListCache.map(function (s) {
+          if (s.id !== id) return s;
+          return Object.assign({}, s, fields);
+        });
+        renderPhotoList(photoListCache);
+      }
+    }
+    /** รีเฟรชทั้งหน้า (fallback สำหรับกรณีที่ไม่รู้ว่าอะไรเปลี่ยน) */
     function refreshAllStudentLists() {
       document.getElementById('btnSearch').click();
       if (photoListCache.length || document.getElementById('panel-photos').classList.contains('active')) {
@@ -1703,7 +1723,7 @@
             showMsg('editMsg', 'อัปโหลดสำเร็จ (รอเผยแพร่) ชื่อไฟล์: ' + res.fileName, 'success');
             document.getElementById('editPhotoPreview').outerHTML =
               '<img class="photo-preview" id="editPhotoPreview" src="' + res.photoUrl + '">';
-            refreshAllStudentLists();
+            updateSearchCache(currentEditId, { photoUrl: res.photoUrl, photoFile: res.fileName, photoStatus: 'pending' });
           })
           .withFailureHandler(function (err) {
             btn.disabled = false; btn.textContent = 'อัปโหลด/เปลี่ยนรูป';
@@ -1726,7 +1746,8 @@
         .withSuccessHandler(function () {
           btn.disabled = false;
           showMsg('editMsg', 'บันทึกรหัสจริงสำเร็จ', 'success');
-          refreshAllStudentLists();
+          const newVal = document.getElementById('editRealId').value.trim();
+          updateSearchCache(currentEditId, { realId: newVal });
         })
         .withFailureHandler(function (err) {
           btn.disabled = false;
@@ -1742,6 +1763,15 @@
     document.getElementById('btnCloseEditModal').addEventListener('click', closeEditModal);
     document.getElementById('editFormCard').addEventListener('click', function (e) {
       if (e.target === this) closeEditModal();
+    });
+
+    function closePhotoMobileModal() {
+      document.getElementById('photoMobileModal').classList.remove('active');
+      document.getElementById('photoMobileContent').innerHTML = '';
+    }
+    document.getElementById('btnClosePhotoMobile').addEventListener('click', closePhotoMobileModal);
+    document.getElementById('photoMobileModal').addEventListener('click', function (e) {
+      if (e.target === this) closePhotoMobileModal();
     });
 
     function closeMoveModal() {
@@ -1763,7 +1793,7 @@
         .withSuccessHandler(function () {
           btn.disabled = false;
           showMsg('editMsg', 'บันทึกรหัสชั่วคราวสำเร็จ', 'success');
-          refreshAllStudentLists();
+          updateSearchCache(currentEditId, { tempId: newTempId });
         })
         .withFailureHandler(function (err) {
           btn.disabled = false;
@@ -1780,9 +1810,11 @@
       const btn = document.getElementById('btnSaveEdit');
       btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
       google.script.run
-        .withSuccessHandler(function () {
+        .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'บันทึกการแก้ไข';
-          refreshAllStudentLists();
+          const msg = res && !res.changed ? 'ข้อมูลเหมือนเดิม ไม่มีการเปลี่ยนแปลง' : 'บันทึกสำเร็จ';
+          showMsg('editMsg', msg, res && !res.changed ? '' : 'success');
+          updateSearchCache(currentEditId, { phone: phoneVal, customValues: collectCustomFieldValues('editCustomFieldsWrap') });
           closeEditModal();
         })
         .withFailureHandler(function (err) {
@@ -2206,12 +2238,13 @@
       google.script.run
         .withSuccessHandler(function (list) {
           if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีข้อมูลที่อัปเดตใหม่</div>'; return; }
-          let html = '<table><tr><th><input type="checkbox" id="dataUpdatesSelectAll"></th><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th></tr>';
+          let html = '<table><tr><th><input type="checkbox" id="dataUpdatesSelectAll"></th><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้อง</th><th></th></tr>';
           list.forEach(function (s) {
             html += '<tr><td><input type="checkbox" class="dataUpdateChk" value="' + s.id + '"></td>' +
               '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
               '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
-              '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td></tr>';
+              '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+              '<td><button class="btn small secondary" onclick="clearStudentUpdate(\'' + escapeJs(s.id) + '\')">ลบออกจากรายการ</button></td></tr>';
           });
           html += '</table>';
           container.innerHTML = html;
@@ -2223,6 +2256,22 @@
         .getRecentlyModifiedStudents(TOKEN, false);
     }
     document.getElementById('btnRefreshDataUpdates').addEventListener('click', loadDataUpdatesList);
+
+    function clearStudentUpdate(id) {
+      if (!confirm('ยืนยันลบรายการนี้ออกจาก "ข้อมูลที่มีการอัปเดต" โดยไม่ส่ง? ข้อมูลของนักเรียนยังคงอยู่ครบ แค่จะไม่ขึ้นในรายการรออีกจนกว่าจะมีการแก้ไขใหม่')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadDataUpdatesList(); })
+        .withFailureHandler(function (err) { alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminClearStudentUpdate(TOKEN, id);
+    }
+
+    function cancelPendingPhoto(id) {
+      if (!confirm('ยืนยันยกเลิกรูปที่รอเผยแพร่นี้? รูปนี้จะออกจากรายการรอเผยแพร่ (รูปที่เคยเผยแพร่ไว้แล้วจะยังอยู่ในโฟลเดอร์เดิม)')) return;
+      google.script.run
+        .withSuccessHandler(function () { loadPendingList(); })
+        .withFailureHandler(function (err) { alert('เกิดข้อผิดพลาด: ' + err.message); })
+        .adminCancelPendingPhoto(TOKEN, id);
+    }
 
     // ===================================================================
     // ประวัติการส่งข้อมูลทั้งหมด (แอดมิน) — รายการเดียวกับที่บริษัทเห็น
@@ -2267,9 +2316,9 @@
     }
 
     function deleteOneSendHistory(rowNum) {
-      if (!confirm('ยืนยันลบประวัติรายการนี้?')) return;
+      if (!confirm('ยืนยันลบประวัติรายการนี้?\n\n⚠️ ถ้าบริษัทยังไม่ได้ดาวน์โหลด — รายการจะถูกย้อนกลับไปรอส่งใหม่ใน "รูปที่รอเผยแพร่" หรือ "ข้อมูลที่มีการอัปเดต" โดยอัตโนมัติ')) return;
       google.script.run
-        .withSuccessHandler(function () { loadSendHistory(); })
+        .withSuccessHandler(function () { loadSendHistory(); loadPendingList(); loadDataUpdatesList(); })
         .withFailureHandler(function (err) { alert('เกิดข้อผิดพลาด: ' + err.message); })
         .adminDeleteSendHistoryRow(TOKEN, rowNum);
     }
@@ -2285,9 +2334,9 @@
     document.getElementById('btnDeleteSelectedHistory').addEventListener('click', function () {
       const rows = Array.prototype.map.call(document.querySelectorAll('.historyChk:checked'), function (c) { return parseInt(c.value, 10); });
       if (!rows.length) { showMsg('sendHistoryMsg', 'กรุณาเลือกรายการที่ต้องการลบ', 'error'); return; }
-      if (!confirm('ยืนยันลบ ' + rows.length + ' รายการที่เลือก?')) return;
+      if (!confirm('ยืนยันลบ ' + rows.length + ' รายการที่เลือก?\n\n⚠️ รายการที่บริษัทยังไม่ดาวน์โหลดจะถูกย้อนกลับไปรอส่งใหม่โดยอัตโนมัติ')) return;
       google.script.run
-        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบสำเร็จ', 'success'); loadSendHistory(); })
+        .withSuccessHandler(function () { showMsg('sendHistoryMsg', 'ลบสำเร็จ', 'success'); loadSendHistory(); loadPendingList(); loadDataUpdatesList(); })
         .withFailureHandler(function (err) { showMsg('sendHistoryMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
         .adminDeleteSendHistoryRows(TOKEN, rows);
     });
@@ -2385,7 +2434,7 @@
     function renderPendingList(list) {
       const container = document.getElementById('pendingList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่มีรูปที่รอเผยแพร่</div>'; return; }
-      let html = '<div class="table-scroll"><table><tr><th><input type="checkbox" id="pendingSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th><input type="checkbox" id="pendingSelectAll"></th><th>รูป</th><th>รหัสนักเรียน</th><th>ข้อมูล</th><th>ชั้น/ห้อง</th><th></th></tr>';
       list.forEach(function (s) {
         html += '<tr>' +
           '<td><input type="checkbox" class="pendingChk" value="' + s.id + '"></td>' +
@@ -2393,6 +2442,7 @@
           '<td>' + bothCodesFor(s) + '</td>' +
           '<td style="font-size:12px;">' + formatCustomFieldsSummary(s.customFields) + '</td>' +
           '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+          '<td><button class="btn small danger" onclick="cancelPendingPhoto(\'' + escapeJs(s.id) + '\')">ยกเลิก</button></td>' +
           '</tr>';
       });
       html += '</table></div>';
