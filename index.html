@@ -103,6 +103,8 @@
     .inline-form input { width: 140px; }
     .photo-preview { width: 110px; height: 110px; border-radius: 10px; object-fit: cover; background: #e2e8f0; display: block; margin-bottom: 10px; }
     .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+    @keyframes rowHighlight { 0% { background: #d1fae5; } 100% { background: transparent; } }
+    .row-new { animation: rowHighlight 2s ease-out; }
     .photo-grid-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; background: var(--card); }
     .photo-grid-item img.grid-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #e2e8f0; display: block; }
     .photo-grid-item .grid-caption { font-size: 12px; margin-top: 8px; line-height: 1.5; text-align: left; }
@@ -571,8 +573,6 @@
         <div class="card">
           <h2>รายการข้อมูลที่มีการอัปเดต (ไม่รวมรูป)</h2>
           <div class="hint">ข้อมูลที่มีการบันทึกรหัสจริง รหัสชั่วคราว หรือข้อมูลทั่วไปอื่นๆ (ไม่ใช่การเปลี่ยนรูป) — เลือกรายการที่ต้องการส่งให้บริษัทพร้อมกับรูป (ถ้ามี) ได้ที่นี่</div>
-          <br>
-          <button class="btn secondary small" id="btnRefreshDataUpdates">รีเฟรชรายการ</button>
           <div id="dataUpdatesList" style="margin-top:14px;"></div>
           <div class="divider"></div>
           <div class="grid">
@@ -597,7 +597,6 @@
           <div class="hint">รายการเดียวกับที่บริษัทเห็นในแท็บดาวน์โหลดข้อมูล — พื้นเขียวคือบริษัทดาวน์โหลดไปแล้ว รายการจะไม่หายไปเองจนกว่าจะลบ</div>
           <br>
           <div class="inline-form">
-            <button class="btn secondary small" id="btnRefreshSendHistory">รีเฟรชรายการ</button>
             <button class="btn small secondary" id="btnViewSelectedHistory">ดูรายละเอียดที่เลือก</button>
             <button class="btn small secondary" id="btnDownloadSelectedHistory">📊 ดาวน์โหลด Excel (CSV)</button>
             <button class="btn small secondary" id="btnPrintSelectedHistory">🖨️ พิมพ์ที่เลือก / บันทึกเป็น PDF</button>
@@ -649,12 +648,10 @@
           <div class="hint">ติ๊กเลือกรายการที่ต้องการจากตารางใดก็ได้ (เลือกข้าม 2 ตารางได้) แล้วกด "ดูรายละเอียดที่เลือก" ด้านล่างเพื่อดาวน์โหลด Excel หรือพิมพ์/บันทึกเป็น PDF รวมกันในหน้าเดียว</div>
           <br>
           <h3 style="margin:0 0 8px;">📷 ตารางรายการอัปเดตรูป / เปลี่ยนรหัสชั่วคราว-รหัสจริง</h3>
-          <button class="btn small secondary" id="btnRefreshCoPhotos">รีเฟรชรายการ</button>
           <div id="coNotifyPhotos" class="hint" style="margin-top:10px;">กำลังโหลด...</div>
 
           <div class="divider"></div>
           <h3 style="margin:0 0 8px;">📄 ตารางรายการอัปเดตข้อมูลอื่นๆ</h3>
-          <button class="btn small secondary" id="btnRefreshCoData">รีเฟรชรายการ</button>
           <div id="coNotifyData" class="hint" style="margin-top:10px;">กำลังโหลด...</div>
 
           <div class="divider"></div>
@@ -881,13 +878,127 @@
         .getNotificationCounts();
     }
     loadBellCounts();
-    setInterval(loadBellCounts, 60000); // รีเฟรชจำนวนกระดิ่งทุก 1 นาที
+    setInterval(loadBellCounts, 60000);
 
-    // กันมือถือบางรุ่นค้างหน้าเดิม (จาก bfcache) หลังสลับไปแอปกล้องแล้วกลับมา —
-    // ถ้าเบราว์เซอร์คืนหน้าแบบ persisted (ไม่ได้โหลดใหม่จริง) ให้รีเฟรชจำนวนกระดิ่งเพื่อ "ปลุก" หน้าให้ตอบสนองอีกครั้ง
     window.addEventListener('pageshow', function (e) {
       if (e.persisted) { loadBellCounts(); }
     });
+
+    // ===================================================================
+    // BACKGROUND POLLING — เงียบ ไม่กระพริบ ไม่ขัดการทำงานของผู้ใช้
+    // ===================================================================
+    var _pollBusy = false;
+
+    function isUserBusy_() {
+      if (document.querySelector('.modal-overlay.active')) return true;
+      var el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return true;
+      return false;
+    }
+
+    /** merge รายการใหม่เข้า table ที่มี data-id แบบ surgical — ไม่ redraw ทั้ง table ไม่กระพริบ */
+    function silentMergeTable_(tableEl, newList, buildRowHtml, getId, getHash) {
+      if (!tableEl) return;
+      var tbody = tableEl.querySelector('tbody') || tableEl;
+      var existingRows = {};
+      tbody.querySelectorAll('tr[data-id]').forEach(function (tr) { existingRows[tr.dataset.id] = tr; });
+      var newIds = {};
+      newList.forEach(function (item) {
+        var id = getId(item);
+        var hash = getHash(item);
+        newIds[id] = true;
+        if (existingRows[id]) {
+          if (existingRows[id].dataset.hash !== hash) {
+            var tmp = document.createElement('template');
+            tmp.innerHTML = buildRowHtml(item);
+            var newTr = tmp.content.firstElementChild;
+            newTr.classList.add('row-new');
+            tbody.replaceChild(newTr, existingRows[id]);
+          }
+        } else {
+          var tmp2 = document.createElement('template');
+          tmp2.innerHTML = buildRowHtml(item);
+          var addRow = tmp2.content.firstElementChild;
+          addRow.classList.add('row-new');
+          tbody.appendChild(addRow);
+        }
+      });
+      Object.keys(existingRows).forEach(function (id) {
+        if (!newIds[id]) existingRows[id].remove();
+      });
+    }
+
+    function silentPollSearchResults_(newList) {
+      lastSearchResults = newList;
+      var tableEl = document.querySelector('#searchResults table');
+      if (!tableEl) return;
+      var delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
+      silentMergeTable_(tableEl, newList,
+        function (s) {
+          var hash = [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room].join('|');
+          return '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '">' +
+            '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+            '<td style="white-space:nowrap;">' + codesAndNameRow(s) + '</td>' +
+            '<td>' + statusBadge(s) + '</td>' +
+            '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
+            '<td><button class="btn small" onclick="openEdit(\'' + escapeJs(s.id) + '\')">แก้ไข</button> ' +
+            '<button class="btn small danger" onclick="deleteRow(\'' + escapeJs(s.id) + '\', this)">' + delLabel + '</button></td>' +
+            '</tr>';
+        },
+        function (s) { return s.id; },
+        function (s) { return escapeHtml([s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room].join('|')); }
+      );
+    }
+
+    function silentPollPhotoList_(newList) {
+      photoListCache = newList;
+      var tableEl = document.querySelector('#photoStudentList table');
+      if (!tableEl) return;
+      silentMergeTable_(tableEl, newList,
+        function (s) {
+          var hash = [s.photoUrl, s.photoStatus].join('|');
+          return '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '" style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
+            '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+            '<td style="font-size:11px;word-break:break-word;">' + codesAndNameRow(s, true) + '</td>' +
+            '</tr>';
+        },
+        function (s) { return s.id; },
+        function (s) { return escapeHtml([s.photoUrl, s.photoStatus].join('|')); }
+      );
+    }
+
+    function runBackgroundPoll_() {
+      if (_pollBusy || isUserBusy_() || !TOKEN) return;
+      _pollBusy = true;
+      loadBellCounts();
+      var activePanel = document.querySelector('.panel.active');
+      if (!activePanel) { _pollBusy = false; return; }
+      var pid = activePanel.id;
+
+      if (pid === 'panel-dataManage') {
+        var activeSub = activePanel.querySelector('.subpanel.active');
+        if (activeSub && activeSub.id === 'sub-searchEdit' && lastSearchResults.length) {
+          var q = document.getElementById('searchQuery') ? document.getElementById('searchQuery').value : '';
+          var g = document.getElementById('searchGrade') ? document.getElementById('searchGrade').value : '';
+          var r = document.getElementById('searchRoom') ? document.getElementById('searchRoom').value : '';
+          google.script.run
+            .withSuccessHandler(function (list) { silentPollSearchResults_(list); _pollBusy = false; })
+            .withFailureHandler(function () { _pollBusy = false; })
+            .listStudents(TOKEN, { query: q, grade: g, room: r });
+        } else { _pollBusy = false; }
+
+      } else if (pid === 'panel-photos' && photoListCache.length) {
+        var pg = document.getElementById('photoFilterGrade') ? document.getElementById('photoFilterGrade').value : '';
+        var pr = document.getElementById('photoFilterRoom') ? document.getElementById('photoFilterRoom').value : '';
+        google.script.run
+          .withSuccessHandler(function (list) { silentPollPhotoList_(list); _pollBusy = false; })
+          .withFailureHandler(function () { _pollBusy = false; })
+          .listPendingPhotos(TOKEN, { grade: pg, room: pr });
+
+      } else { _pollBusy = false; }
+    }
+
+    setInterval(runBackgroundPoll_, 30000);
 
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
@@ -1099,6 +1210,7 @@
       }
 
       if (tabs.length && !studentTabPending) switchTab(tabs[0]);
+      if (ROLE === 'admin' || ROLE === 'teacher') setInterval(runBackgroundPoll_, 30000);
     }
 
     function switchTab(tab) {
@@ -1524,7 +1636,8 @@
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
       let html = '<table style="table-layout:fixed;"><tr><th style="width:48px;">รูป</th><th>รหัส / ชื่อ</th></tr>';
       list.forEach(function (s) {
-        html += '<tr style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
+        const hash = [s.photoUrl, s.photoStatus].join('|');
+        html += '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '" style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
           '<td style="font-size:11px;word-break:break-word;">' + codesAndNameRow(s, true) + '</td>' +
           '</tr>';
@@ -1618,7 +1731,8 @@
       const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
       let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
       list.forEach(function (s) {
-        html += '<tr>' +
+        const hash = [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room].join('|');
+        html += '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
           '<td style="white-space:nowrap;">' + codesAndNameRow(s) + '</td>' +
           '<td>' + statusBadge(s) + '</td>' +
@@ -2248,7 +2362,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .getRecentlyModifiedStudents(TOKEN, false);
     }
-    document.getElementById('btnRefreshDataUpdates').addEventListener('click', loadDataUpdatesList);
 
     function clearStudentUpdate(id) {
       if (!confirm('ยืนยันลบรายการนี้ออกจาก "ข้อมูลที่มีการอัปเดต" โดยไม่ส่ง? ข้อมูลของนักเรียนยังคงอยู่ครบ แค่จะไม่ขึ้นในรายการรออีกจนกว่าจะมีการแก้ไขใหม่')) return;
@@ -2277,7 +2390,6 @@
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
         .adminListSendHistory(TOKEN);
     }
-    document.getElementById('btnRefreshSendHistory').addEventListener('click', loadSendHistory);
 
     let sendHistoryCache = [];
     function renderSendHistory(list) {
@@ -2670,8 +2782,6 @@
         document.querySelectorAll('.' + chkClass).forEach(function (c) { c.checked = e.target.checked; });
       });
     }
-    document.getElementById('btnRefreshCoPhotos').addEventListener('click', loadCompanyNotifications);
-    document.getElementById('btnRefreshCoData').addEventListener('click', loadCompanyNotifications);
 
     function getSelectedCoNotifyItems() {
       const photoRows = Array.prototype.map.call(document.querySelectorAll('.coPhotoChk:checked'), function (c) { return parseInt(c.value, 10); });
