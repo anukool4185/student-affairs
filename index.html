@@ -418,6 +418,7 @@
           </div>
           <br>
           <button class="btn secondary small" id="btnPhotoListSearch">ค้นหา</button>
+          <div class="hint" style="font-size:11px;">บนมือถือ: เลือกชั้น/ห้องแล้วระบบจะค้นหาให้อัตโนมัติ</div>
 
           <div style="display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;">
             <div style="flex:0 1 260px; min-width:220px;">
@@ -1621,6 +1622,14 @@
     }
 
     document.getElementById('btnPhotoListSearch').addEventListener('click', searchPhotoList);
+
+    // มือถือ: เลือก dropdown แล้วค้นหาอัตโนมัติ ไม่ต้องกดปุ่มค้นหาเอง
+    ['photoFilterGrade', 'photoFilterRoom'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', function () {
+        if (window.innerWidth < 768) searchPhotoList();
+      });
+    });
+
     function searchPhotoList() {
       const filter = { query: document.getElementById('photoFilterQuery').value.trim() };
       if (ROLE === 'admin') {
@@ -1645,12 +1654,13 @@
       photoListCache = list;
       const container = document.getElementById('photoStudentList');
       if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table style="table-layout:fixed;"><tr><th style="width:48px;">รูป</th><th>รหัส / ชื่อ</th></tr>';
+      let html = '<table style="table-layout:fixed;"><tr><th style="width:42px;">รูป</th><th>รหัส / ชื่อ</th><th style="width:54px;font-size:10px;">ชั้น/ห้อง</th></tr>';
       list.forEach(function (s) {
         const hash = [s.photoUrl, s.photoStatus].join('|');
         html += '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '" style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
           '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
           '<td style="font-size:11px;word-break:break-word;">' + codesAndNameRow(s, true) + '</td>' +
+          '<td style="font-size:10px;color:var(--muted);">' + escapeHtml(s.grade) + '<br>ห้อง ' + escapeHtml(s.room) + '</td>' +
           '</tr>';
       });
       html += '</table>';
