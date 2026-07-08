@@ -818,6 +818,7 @@
     fillSelect(document.getElementById('moveFilterRoom'), roomOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('coGrade'), gradeOptions, 'ทั้งหมด');
     fillSelect(document.getElementById('coRoom'), roomOptions, 'ทั้งหมด');
+    initPhotoFilters(); // photo filter dropdowns — ต้องเรียกหลัง login เพราะต้องการ gradeOptions/roomOptions
 
     document.getElementById('addGrade').addEventListener('change', updateTempIdPreview);
     document.getElementById('addRoom').addEventListener('change', updateTempIdPreview);
@@ -1609,12 +1610,9 @@
     let photoListCache = [];
 
     function initPhotoFilters() {
-      if (ROLE === 'admin') {
-        fillSelect(document.getElementById('photoFilterGrade'), gradeOptions, 'ทั้งหมด');
-        fillSelect(document.getElementById('photoFilterRoom'), roomOptions, 'ทั้งหมด');
-      }
+      fillSelect(document.getElementById('photoFilterGrade'), gradeOptions, 'ทั้งหมด');
+      fillSelect(document.getElementById('photoFilterRoom'), roomOptions, 'ทั้งหมด');
     }
-    initPhotoFilters();
 
     function loadPhotoTab() {
       document.getElementById('photoDetailPane').innerHTML = '<div class="hint">เลือกรายชื่อทางซ้ายเพื่ออัปโหลด/เปลี่ยนรูป</div>';
