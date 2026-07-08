@@ -966,7 +966,9 @@
     function runBackgroundPoll_() {
       if (_pollBusy || isUserBusy_() || !TOKEN) return;
       _pollBusy = true;
-      loadBellCounts();
+      // ไม่เรียก loadBellCounts() ที่นี่ — มี setInterval ของตัวเองแล้ว (ทุก 60 วินาที)
+      // การเรียกซ้ำทำให้เกิด concurrent request หลายตัวพร้อมกัน Apps Script ตอบผิดพลาด
+
       var activePanel = document.querySelector('.panel.active');
       if (!activePanel) { _pollBusy = false; return; }
       var pid = activePanel.id;
@@ -989,31 +991,12 @@
         google.script.run
           .withSuccessHandler(function (list) { silentPollPhotoList_(list); _pollBusy = false; })
           .withFailureHandler(function () { _pollBusy = false; })
-          .listPendingPhotos(TOKEN, { grade: pg, room: pr });
-
-      } else if (pid === 'panel-publish') {
-        // โหลด pending + data-updates แบบเงียบ (ไม่ re-render ถ้ายังไม่มีตาราง)
-        google.script.run
-          .withSuccessHandler(function (list) { _pollBusy = false; if (document.querySelector('#pendingList table')) renderPendingList(list); })
-          .withFailureHandler(function () { _pollBusy = false; })
-          .listPendingPhotos(TOKEN, {});
-
-      } else if (pid === 'panel-messages') {
-        google.script.run
-          .withSuccessHandler(function () { _pollBusy = false; loadRequestsList(); })
-          .withFailureHandler(function () { _pollBusy = false; })
-          .getNotificationCounts();  // lightweight ping — แค่เช็คว่ามีอะไรใหม่
-
-      } else if (pid === 'panel-myRequests') {
-        google.script.run
-          .withSuccessHandler(function () { _pollBusy = false; loadMyRequestsList(); })
-          .withFailureHandler(function () { _pollBusy = false; })
-          .getNotificationCounts();
+          .listPendingPhotos(TOKEN);
 
       } else { _pollBusy = false; }
     }
 
-    setInterval(runBackgroundPoll_, 30000);
+    setInterval(runBackgroundPoll_, 45000);
 
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
@@ -1225,7 +1208,6 @@
       }
 
       if (tabs.length && !studentTabPending) switchTab(tabs[0]);
-      if (ROLE === 'admin' || ROLE === 'teacher') setInterval(runBackgroundPoll_, 30000);
     }
 
     function switchTab(tab) {
