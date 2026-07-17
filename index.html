@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -11,6 +11,7 @@
       --border: #e2e8f0; --text: #1e293b; --text-muted: #64748b; --success: #16a34a; --danger: #dc2626;
     }
     * { box-sizing: border-box; }
+    html { font-size: clamp(13px, 3.8vw, 16px); } /* fluid type: ปรับอัตโนมัติตามความกว้างหน้าจอ 13-16px */
     html { overflow-x: hidden; width: 100%; }
     body { margin: 0; font-family: 'Sarabun', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; width: 100%; }
 
@@ -173,14 +174,15 @@
        ================================================================ */
     @media (max-width: 767px) {
       /* แสดง bottom nav — ซ่อน top nav */
+      #tabNav { display: none !important; }
       #mobileBottomNav { display: flex !important; }
 
       /* --- Header ลดขนาด --- */
       header { padding: 10px 14px; gap: 6px; }
-      header .title h1 { font-size: 15px; }
-      header .title p { font-size: 11px; }
-      header .userbox { font-size: 12px; gap: 6px; }
-      header .userbox button { padding: 5px 9px; font-size: 12px; }
+      header .title h1 { font-size: 1.08em; }
+      header .title p { font-size: 0.78em; }
+      header .userbox { font-size: 0.82em; gap: 6px; }
+      header .userbox button { padding: 5px 9px; font-size: 0.82em; }
 
       /* --- กระดิ่งบนหัว --- */
       .bell-pill { padding: 5px 9px; font-size: 12px; }
@@ -188,18 +190,18 @@
       /* --- Nav tabs: scroll ซ้ายขวาได้ ไม่ wrap --- */
       nav { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; scrollbar-width: none; }
       nav::-webkit-scrollbar { display: none; }
-      nav button { min-width: 90px; padding: 12px 8px; font-size: 12px; flex-shrink: 0; }
+      nav button { min-width: 90px; padding: 12px 8px; font-size: 0.8em; flex-shrink: 0; }
 
       /* --- Subnav pills --- */
       .subnav { gap: 4px; }
-      .subnav button { padding: 6px 10px; font-size: 12px; }
+      .subnav button { padding: 6px 10px; font-size: 0.82em; }
 
       /* เพิ่ม padding ด้านล่างกัน content ซ่อนหลัง bottom nav */
       main { padding: 12px 10px 90px; }
 
       /* --- Card ลด padding --- */
       .card { padding: 14px 12px; margin-bottom: 14px; }
-      .card h2 { font-size: 15px; margin-bottom: 10px; }
+      .card h2 { font-size: 1.05em; margin-bottom: 10px; }
 
       /* --- Grid: 1 คอลัมน์เสมอบนมือถือ --- */
       .grid { grid-template-columns: 1fr; gap: 8px; }
@@ -212,13 +214,13 @@
 
       /* --- ตาราง: scroll ซ้ายขวา ป้องกัน overflow --- */
       .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px; border-radius: 6px; }
-      table { font-size: 12px; }
+      table { font-size: 0.82em; }
       th, td { padding: 6px 5px; }
-      th { font-size: 11px; }
+      th { font-size: 0.78em; }
 
       /* --- ปุ่มบนมือถือใหญ่ขึ้น touch-friendly --- */
-      button.btn { min-height: 42px; font-size: 14px; }
-      button.btn.small { min-height: 34px; padding: 5px 10px; font-size: 12px; }
+      button.btn { min-height: 42px; font-size: 1em; }
+      button.btn.small { min-height: 34px; padding: 5px 10px; font-size: 0.82em; }
 
       /* --- Input / Select / Textarea ใช้ font 16px กัน iOS zoom --- */
       input, select, textarea { font-size: 16px; }
@@ -236,8 +238,8 @@
       #photoDetailPane { width: 100%; }
 
       /* --- Hint และ badge ลดขนาด --- */
-      .hint { font-size: 11px; }
-      .badge { font-size: 10px; padding: 2px 6px; }
+      .hint { font-size: 0.78em; }
+      .badge { font-size: 0.72em; padding: 2px 6px; }
       .bell-count { font-size: 11px; padding: 1px 5px; min-width: 16px; }
 
       /* --- thumb รูปขนาดเล็กลง --- */
