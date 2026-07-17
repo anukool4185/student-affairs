@@ -908,6 +908,7 @@
 
     let currentMoveStudent = null;
     let moveResultsCache = [];
+    let sendHistoryCache = [];
     let currentEditId = null;
     let editingFieldId = null;
     let formFields = [];
@@ -2540,7 +2541,6 @@
         .adminListSendHistory(TOKEN);
     }
 
-    let sendHistoryCache = [];
     function renderSendHistory(list) {
       sendHistoryCache = list;
       const container = document.getElementById('sendHistoryList');
