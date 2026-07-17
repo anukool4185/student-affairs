@@ -137,6 +137,132 @@
       cursor: pointer; color: var(--text-muted);
     }
     .modal-close:hover { color: var(--text); }
+
+    /* ================================================================
+       MOBILE BOTTOM NAVIGATION BAR
+       ================================================================ */
+    #mobileBottomNav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      background: var(--card); border-top: 1px solid var(--border);
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+      display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; padding: 0 4px;
+      height: 58px; align-items: stretch;
+    }
+    #mobileBottomNav::-webkit-scrollbar { display: none; }
+    .mob-nav-item {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 64px; flex: 1; padding: 6px 4px 8px;
+      background: none; border: none; cursor: pointer;
+      font-family: 'Sarabun', sans-serif; font-size: 10px; color: var(--text-muted);
+      white-space: nowrap; line-height: 1.2; gap: 3px;
+      border-top: 2px solid transparent; transition: color 0.15s;
+    }
+    .mob-nav-item .mob-icon { font-size: 20px; line-height: 1; }
+    .mob-nav-item .mob-label { font-size: 10px; }
+    .mob-nav-item.active { color: var(--primary); border-top-color: var(--primary); }
+    .mob-nav-item.has-badge { position: relative; }
+    .mob-nav-item.has-badge::after {
+      content: ''; position: absolute; top: 6px; right: calc(50% - 14px);
+      width: 8px; height: 8px; background: var(--danger);
+      border-radius: 50%; border: 2px solid var(--card);
+    }
+
+    /* ================================================================
+       MOBILE RESPONSIVE — ปรับทั้งระบบสำหรับหน้าจอโทรศัพท์
+       ================================================================ */
+    @media (max-width: 767px) {
+      /* แสดง bottom nav — ซ่อน top nav */
+      #mobileBottomNav { display: flex !important; }
+
+      /* --- Header ลดขนาด --- */
+      header { padding: 10px 14px; gap: 6px; }
+      header .title h1 { font-size: 15px; }
+      header .title p { font-size: 11px; }
+      header .userbox { font-size: 12px; gap: 6px; }
+      header .userbox button { padding: 5px 9px; font-size: 12px; }
+
+      /* --- กระดิ่งบนหัว --- */
+      .bell-pill { padding: 5px 9px; font-size: 12px; }
+
+      /* --- Nav tabs: scroll ซ้ายขวาได้ ไม่ wrap --- */
+      nav { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; scrollbar-width: none; }
+      nav::-webkit-scrollbar { display: none; }
+      nav button { min-width: 90px; padding: 12px 8px; font-size: 12px; flex-shrink: 0; }
+
+      /* --- Subnav pills --- */
+      .subnav { gap: 4px; }
+      .subnav button { padding: 6px 10px; font-size: 12px; }
+
+      /* เพิ่ม padding ด้านล่างกัน content ซ่อนหลัง bottom nav */
+      main { padding: 12px 10px 90px; }
+
+      /* --- Card ลด padding --- */
+      .card { padding: 14px 12px; margin-bottom: 14px; }
+      .card h2 { font-size: 15px; margin-bottom: 10px; }
+
+      /* --- Grid: 1 คอลัมน์เสมอบนมือถือ --- */
+      .grid { grid-template-columns: 1fr; gap: 8px; }
+
+      /* --- Inline form: stack แนวตั้ง --- */
+      .inline-form { flex-direction: column; align-items: stretch; gap: 8px; }
+      .inline-form input { width: 100%; }
+      .inline-form button { width: 100%; }
+      .inline-form label { width: auto; }
+
+      /* --- ตาราง: scroll ซ้ายขวา ป้องกัน overflow --- */
+      .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px; border-radius: 6px; }
+      table { font-size: 12px; }
+      th, td { padding: 6px 5px; }
+      th { font-size: 11px; }
+
+      /* --- ปุ่มบนมือถือใหญ่ขึ้น touch-friendly --- */
+      button.btn { min-height: 42px; font-size: 14px; }
+      button.btn.small { min-height: 34px; padding: 5px 10px; font-size: 12px; }
+
+      /* --- Input / Select / Textarea ใช้ font 16px กัน iOS zoom --- */
+      input, select, textarea { font-size: 16px; }
+
+      /* --- Modal เต็มจอบนมือถือ --- */
+      .modal-box { max-width: 100%; border-radius: 14px 14px 0 0; max-height: 92vh; padding: 18px 16px; }
+      .modal-overlay { padding: 0; align-items: flex-end; }
+
+      /* --- Photo layout: 2 คอลัมน์ แทนที่ auto-fill --- */
+      .photo-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+      /* --- แท็บจัดการรูปภาพ: list ซ้าย + detail ขวา → stack แนวตั้ง --- */
+      #photoLayout { flex-direction: column; }
+      #photoStudentList { width: 100%; min-height: unset; max-height: 40vh; overflow-y: auto; }
+      #photoDetailPane { width: 100%; }
+
+      /* --- Hint และ badge ลดขนาด --- */
+      .hint { font-size: 11px; }
+      .badge { font-size: 10px; padding: 2px 6px; }
+      .bell-count { font-size: 11px; padding: 1px 5px; min-width: 16px; }
+
+      /* --- thumb รูปขนาดเล็กลง --- */
+      .thumb { width: 34px; height: 34px; }
+
+      /* --- Photo preview ใหญ่ขึ้นบนมือถือ --- */
+      .photo-preview { width: 140px; height: 140px; }
+
+      /* --- Divider ลด margin --- */
+      .divider { margin: 12px 0; }
+
+      /* --- Buttons ต่อเนื่อง เช่น toolbar ห่อได้ --- */
+      .btn-group { display: flex; flex-wrap: wrap; gap: 6px; }
+
+      /* --- ซ่อนตัวหน้าจอกว้างบนมือถือ --- */
+      .hide-mobile { display: none !important; }
+    }
+
+    /* เพิ่มเติมสำหรับหน้าจอเล็กมาก < 380px */
+    @media (max-width: 380px) {
+      nav button { min-width: 80px; font-size: 11px; padding: 10px 6px; }
+      .card { padding: 12px 10px; }
+      main { padding: 10px 8px 80px; }
+      button.btn { font-size: 13px; }
+    }
     @media print {
       body * { visibility: hidden; }
       .print-target, .print-target * { visibility: visible; }
@@ -420,8 +546,8 @@
           <button class="btn secondary small" id="btnPhotoListSearch">ค้นหา</button>
           <div class="hint" style="font-size:11px;">บนมือถือ: เลือกชั้น/ห้องแล้วระบบจะค้นหาให้อัตโนมัติ</div>
 
-          <div style="display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;">
-            <div style="flex:0 1 260px; min-width:220px;">
+          <div id="photoLayout" style="display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;">
+            <div style="flex:0 1 260px; min-width:220px; min-height:60px; max-height:60vh; overflow-y:auto;">
               <div id="photoStudentList" class="hint">กดค้นหาเพื่อแสดงรายชื่อ</div>
             </div>
             <div style="flex:1 1 320px; min-width:260px;">
@@ -794,6 +920,26 @@
       messages: 'จัดการข้อความ', myRequests: 'ส่งคำขอถึงแอดมิน', publish: 'การจัดส่งข้อมูล',
       student: 'ข้อมูลของฉัน', studentMessage: 'ส่งข้อความถึงแอดมิน', company: 'ดาวน์โหลดข้อมูล', account: 'บัญชีของฉัน'
     };
+    const TAB_ICONS = {
+      formbuilder: '📋', announcements: '📢', register: '➕', photos: '🖼️',
+      dataManage: '📊', messages: '💬', myRequests: '📝', publish: '📤',
+      student: '👤', studentMessage: '✉️', company: '🏢', account: '⚙️'
+    };
+    const TAB_SHORT = {
+      formbuilder: 'ฟอร์ม', announcements: 'ประกาศ', register: 'ลงทะเบียน', photos: 'รูปภาพ',
+      dataManage: 'ข้อมูล', messages: 'ข้อความ', myRequests: 'คำขอ', publish: 'ส่งข้อมูล',
+      student: 'ของฉัน', studentMessage: 'ส่งข้อความ', company: 'ดาวน์โหลด', account: 'บัญชี'
+    };
+
+    function buildMobileNav(tabs) {
+      const nav = document.getElementById('mobileBottomNav');
+      nav.innerHTML = tabs.map(function (tab) {
+        return '<button class="mob-nav-item" data-tab="' + tab + '" onclick="switchTab(\'' + tab + '\')">' +
+          '<span class="mob-icon">' + (TAB_ICONS[tab] || '•') + '</span>' +
+          '<span class="mob-label">' + (TAB_SHORT[tab] || tab) + '</span>' +
+          '</button>';
+      }).join('');
+    }
     const ROLE_TABS = {
       admin: ['formbuilder', 'announcements', 'register', 'photos', 'dataManage', 'messages', 'publish', 'account'],
       teacher: ['register', 'photos', 'dataManage', 'myRequests', 'account'],
@@ -1173,6 +1319,7 @@
         btn.addEventListener('click', function () { switchTab(tab); });
         nav.appendChild(btn);
       });
+      buildMobileNav(tabs);
 
       if (ROLE === 'admin' || ROLE === 'teacher') {
         loadFormFieldsGlobal(function () {
@@ -1215,6 +1362,8 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       const panel = document.getElementById('panel-' + tab);
       if (panel) panel.classList.add('active');
+      // sync mobile bottom nav active state
+      document.querySelectorAll('.mob-nav-item').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
 
       if (tab === 'formbuilder') loadFormFieldsList();
       if (tab === 'announcements') loadAnnouncementsAdminList();
@@ -3206,5 +3355,8 @@
         .adminAcknowledgeNewData(TOKEN);
     });
   </script>
+  <!-- MOBILE BOTTOM NAV — แสดงเฉพาะบนมือถือ ซ่อนบนคอม -->
+  <div id="mobileBottomNav" style="display:none;"></div>
+
 </body>
 </html>
