@@ -311,9 +311,13 @@
       .table-scroll { overflow: visible; margin: 0; }
       .table-scroll table, .table-scroll tbody { display: block; width: 100%; min-width: 0 !important; }
       .table-scroll tr { display: block; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; padding: 4px 8px; background: var(--card); }
-      .table-scroll tr.th-row { display: none; }
+      .table-scroll tr.th-row { display: flex; border: 0; padding: 0 0 4px; margin: 0; background: none; }
+      .table-scroll tr.th-row th { display: none; }
+      .table-scroll tr.th-row th.has-input { display: flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; font-weight: 600; }
+      .table-scroll tr.th-row th.has-input::after { content: "เลือกทั้งหมด"; font-size: .9em; }
       .table-scroll td { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0 !important; border: 0 !important; text-align: right; min-width: 0; overflow-wrap: anywhere; word-break: break-word; white-space: normal !important; }
       .table-scroll td > * { min-width: 0; max-width: 100%; }
+      .table-scroll td > .tdv { flex: 1 1 auto; text-align: right; overflow-wrap: anywhere; }
       .table-scroll td img.thumb { flex: 0 0 auto; }
       .table-scroll td[data-label]:not([data-label=""])::before { content: attr(data-label); font-weight: 600; color: var(--muted); flex: 0 0 34%; text-align: left; font-size: .85em; }
     }
@@ -337,7 +341,7 @@
 <meta name="apple-mobile-web-app-title" content="DATA-STC.SCHOOL">
 <meta name="application-name" content="DATA-STC.SCHOOL">
 <script>
-var APP_VERSION='1.2.0', APP_VERSION_DATE='13/11/2569';
+var APP_VERSION='1.2.1', APP_VERSION_DATE='13/11/2569';
 document.addEventListener('DOMContentLoaded',function(){
   var t='เวอร์ชัน '+APP_VERSION+' ('+APP_VERSION_DATE+')';
   document.querySelectorAll('.app-version').forEach(function(e){e.textContent=t;});
@@ -1323,10 +1327,19 @@ if('serviceWorker' in navigator){
         var head = rows[0];
         if (!head.querySelector('th')) return;
         head.classList.add('th-row');
+        Array.prototype.forEach.call(head.children, function (th) { if (th.querySelector('input')) th.classList.add('has-input'); });
         var labels = Array.prototype.map.call(head.children, function (c) { return c.textContent.trim(); });
         for (var i = 1; i < rows.length; i++) {
           if (rows[i].dataset.labeled === String(labels.length)) continue;
-          Array.prototype.forEach.call(rows[i].children, function (td, k) { if (!td.hasAttribute('data-label')) td.setAttribute('data-label', labels[k] || ''); });
+          Array.prototype.forEach.call(rows[i].children, function (td, k) {
+            if (!td.hasAttribute('data-label')) td.setAttribute('data-label', labels[k] || '');
+            // รวมเนื้อหาในช่องเป็นก้อนเดียว (มือถือ: ป้ายซ้าย + ค่าขวา ตัดบรรทัดได้ ไม่ดันจนล้นจอ)
+            if (td.tagName === 'TD' && !(td.childNodes.length === 1 && td.firstChild.nodeType === 1 && td.firstChild.classList.contains('tdv'))) {
+              var w = document.createElement('span'); w.className = 'tdv';
+              while (td.firstChild) w.appendChild(td.firstChild);
+              td.appendChild(w);
+            }
+          });
           rows[i].dataset.labeled = String(labels.length);
         }
       });
