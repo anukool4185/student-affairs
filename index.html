@@ -307,6 +307,16 @@
       button.btn { font-size: 13px; }
     }
     @media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 767px) {
+      .table-scroll { overflow: visible; margin: 0; }
+      .table-scroll table, .table-scroll tbody { display: block; width: 100%; min-width: 0 !important; }
+      .table-scroll tr { display: block; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; padding: 4px 8px; background: var(--card); }
+      .table-scroll tr.th-row { display: none; }
+      .table-scroll td { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0 !important; border: 0 !important; text-align: right; min-width: 0; overflow-wrap: anywhere; word-break: break-word; white-space: normal !important; }
+      .table-scroll td > * { min-width: 0; max-width: 100%; }
+      .table-scroll td img.thumb { flex: 0 0 auto; }
+      .table-scroll td[data-label]:not([data-label=""])::before { content: attr(data-label); font-weight: 600; color: var(--muted); flex: 0 0 34%; text-align: left; font-size: .85em; }
+    }
     @media (max-height: 480px) { :root { --bn-h: 44px; } #mobileBottomNav .mob-icon { font-size: 15px !important; } #mobileBottomNav .mob-label { font-size: 9px !important; } }
     @media (max-width: 767px) {
       #photoListBox { flex: 0 0 auto !important; width: 100% !important; }
@@ -327,7 +337,7 @@
 <meta name="apple-mobile-web-app-title" content="DATA-STC.SCHOOL">
 <meta name="application-name" content="DATA-STC.SCHOOL">
 <script>
-var APP_VERSION='1.1.1', APP_VERSION_DATE='13/11/2569';
+var APP_VERSION='1.2.0', APP_VERSION_DATE='13/11/2569';
 document.addEventListener('DOMContentLoaded',function(){
   var t='เวอร์ชัน '+APP_VERSION+' ('+APP_VERSION_DATE+')';
   document.querySelectorAll('.app-version').forEach(function(e){e.textContent=t;});
@@ -464,6 +474,16 @@ if('serviceWorker' in navigator){
   </div>
 
   <!-- ============ POPUP: จัดการรูปภาพบนมือถือ (แสดงเมื่อหน้าจอแคบ) ============ -->
+  <div id="addIdAsk" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100000;background:rgba(15,23,42,.55);align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:14px;padding:18px;max-width:380px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3);">
+      <p style="margin:0 0 6px;font-weight:700;">ตรวจสอบรหัสนักเรียน</p>
+      <p style="margin:0 0 10px;">รหัสนักเรียนที่กรอก "<b id="addIdAskVal"></b>" เป็นรหัสนักเรียนที่โรงเรียนออกให้ อยู่ในใบรายชื่อ ไม่ใช่รหัสตอนสมัครเข้าสอบ ถูกต้องหรือไม่?</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" type="button" id="btnAddIdYes" style="flex:1;">ถูกต้อง ใช้ได้</button>
+        <button class="btn secondary" type="button" id="btnAddIdNo" style="flex:1;">ยังไม่ได้รับรหัสนักเรียน</button>
+      </div>
+    </div>
+  </div>
   <div class="modal-overlay" id="photoMobileModal">
     <div class="modal-box">
       <button class="modal-close" id="btnClosePhotoMobile" type="button" title="ปิด">✕</button>
@@ -625,13 +645,14 @@ if('serviceWorker' in navigator){
         <div class="card">
           <h2>เพิ่มนักเรียนใหม่</h2>
           <div id="addMsg"></div>
-          <div class="grid">
+          <div class="row-one">
             <div id="addGradeWrap"><label>ระดับชั้น *</label><select id="addGrade"></select></div>
             <div id="addRoomWrap"><label>ห้อง *</label><select id="addRoom"></select></div>
-            <div><label>รหัสชั่วคราวที่จะได้</label><input id="addTempPreview" value="กรุณาเลือกระดับชั้นและห้อง" disabled style="background:#f1f5f9;font-weight:600;"></div>
+            <div><label>รหัสชั่วคราว</label><input id="addTempPreview" value="เลือกชั้น/ห้อง" disabled style="background:#f1f5f9;font-weight:600;"></div>
           </div>
-          <div class="grid" style="margin-top:10px;">
-            <div><label>เบอร์โทรนักเรียน (ใช้เป็นพาสเวอร์ด) *</label><input id="addPhone" placeholder="0812345678"></div>
+          <div class="row-one">
+            <div><label>รหัสนักเรียน (ถ้ามี)</label><input id="addRealId" inputmode="numeric" autocomplete="off"></div>
+            <div><label>เบอร์โทรนักเรียน *</label><input id="addPhone" type="tel"></div>
           </div>
           <div class="hint" id="teacherScopeHint" style="display:none;"></div>
           <div class="hint">รหัสชั่วคราวคำนวณจากปี พ.ศ. + ระดับชั้น + ห้อง + ลำดับในชั้น/ห้องเดียวกัน — แก้ไขเองไม่ได้ (ยกเว้นแอดมินแก้ได้ทีหลังที่แท็บ "จัดการข้อมูล")<br>แก้ไข<b>รหัสนักเรียนจริง</b>ได้ที่แท็บ "จัดการข้อมูล &gt; ค้นหา/แก้ไขข้อมูล" หลังบันทึกแล้ว และอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ"<br>ช่องข้อมูลด้านล่างนี้คือช่องที่สร้างไว้ในแท็บ "จัดการฟอร์มข้อมูล" เท่านั้น</div>
@@ -1294,6 +1315,26 @@ if('serviceWorker' in navigator){
       }, { passive: true });
     })();
 
+    /** มือถือ: ตารางหลายคอลัมน์ → การ์ดต่อรายการ (ใส่ป้ายหัวคอลัมน์ให้แต่ละช่อง) ไม่ต้องเลื่อนซ้ายขวา */
+    function labelTables_() {
+      document.querySelectorAll('.table-scroll table').forEach(function (t) {
+        var rows = t.querySelectorAll('tr');
+        if (!rows.length) return;
+        var head = rows[0];
+        if (!head.querySelector('th')) return;
+        head.classList.add('th-row');
+        var labels = Array.prototype.map.call(head.children, function (c) { return c.textContent.trim(); });
+        for (var i = 1; i < rows.length; i++) {
+          if (rows[i].dataset.labeled === String(labels.length)) continue;
+          Array.prototype.forEach.call(rows[i].children, function (td, k) { if (!td.hasAttribute('data-label')) td.setAttribute('data-label', labels[k] || ''); });
+          rows[i].dataset.labeled = String(labels.length);
+        }
+      });
+    }
+    var _lblT = null;
+    new MutationObserver(function () { clearTimeout(_lblT); _lblT = setTimeout(labelTables_, 60); })
+      .observe(document.documentElement, { childList: true, subtree: true });
+
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
       if (placeholder) { const o = document.createElement('option'); o.value = ''; o.textContent = placeholder; select.appendChild(o); }
@@ -1901,6 +1942,19 @@ if('serviceWorker' in navigator){
     // ===================================================================
     // TAB: ลงทะเบียนนักเรียน (admin/teacher)
     // ===================================================================
+    let addIdAsked = '', addIdTimer = null;
+    function addAskId() {
+      const v = document.getElementById('addRealId').value.trim();
+      if (!v || v === addIdAsked) return;
+      document.getElementById('addIdAskVal').textContent = v;
+      document.getElementById('addIdAsk').style.display = 'flex';
+    }
+    document.getElementById('addRealId').addEventListener('input', function () { clearTimeout(addIdTimer); addIdTimer = setTimeout(addAskId, 1500); });
+    document.getElementById('addRealId').addEventListener('change', function () { clearTimeout(addIdTimer); addAskId(); });
+    document.getElementById('addPhone').addEventListener('focus', function () { clearTimeout(addIdTimer); addAskId(); });
+    document.getElementById('btnAddIdYes').addEventListener('click', function () { addIdAsked = document.getElementById('addRealId').value.trim(); document.getElementById('addIdAsk').style.display = 'none'; });
+    document.getElementById('btnAddIdNo').addEventListener('click', function () { document.getElementById('addRealId').value = ''; addIdAsked = ''; document.getElementById('addIdAsk').style.display = 'none'; });
+
     document.getElementById('btnAddStudent').addEventListener('click', function () {
       const grade = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.grade : document.getElementById('addGrade').value;
       const room = (ROLE === 'teacher' && MY_SCOPE) ? MY_SCOPE.room : document.getElementById('addRoom').value;
@@ -1908,7 +1962,7 @@ if('serviceWorker' in navigator){
       if (!grade || !room) { showMsg('addMsg', 'กรุณาเลือก ระดับชั้น และ ห้อง ให้ครบ', 'error'); return; }
       if (!phone) { showMsg('addMsg', 'กรุณากรอกเบอร์โทรนักเรียน (ใช้เป็นพาสเวอร์ดล็อกอิน)', 'error'); return; }
       const info = {
-        grade: grade, room: room, phone: phone,
+        grade: grade, room: room, phone: phone, realId: document.getElementById('addRealId').value.trim(),
         customValues: collectCustomFieldValues('addCustomFieldsWrap')
       };
       const btn = document.getElementById('btnAddStudent');
@@ -1919,6 +1973,7 @@ if('serviceWorker' in navigator){
           showMsg('addMsg', 'บันทึกสำเร็จ! รหัสชั่วคราว: ' + res.tempId + ' — ไปอัปโหลดรูปได้ที่แท็บ "จัดการรูปภาพ" และกำหนดรหัสจริงได้ที่แท็บ "จัดการข้อมูล"', 'success');
           renderCustomFieldInputs('addCustomFieldsWrap', formFields.filter(fieldIsInline), {});
           document.getElementById('addPhone').value = '';
+          document.getElementById('addRealId').value = ''; addIdAsked = '';
           if (ROLE !== 'teacher') {
             document.getElementById('addGrade').value = '';
             document.getElementById('addRoom').value = '';
