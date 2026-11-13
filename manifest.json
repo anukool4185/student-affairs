@@ -1,6 +1,6 @@
 {
-  "name": "ระบบจัดเก็บข้อมูลและรูปภาพนักเรียน",
-  "short_name": "ข้อมูลนักเรียน",
+  "name": "DATA-STC.SCHOOL",
+  "short_name": "DATA-STC.SCHOOL",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
