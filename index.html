@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -54,6 +54,44 @@
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
     .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
 
+    :root { --bn-h: 58px; }
+    html, body { max-width: 100%; overflow-x: hidden; }
+    .filter-row { display: flex; gap: 6px; align-items: flex-end; flex-wrap: nowrap; }
+    .filter-row > div { flex: 1 1 0; min-width: 0; }
+    .filter-row .fgr { display: flex; gap: 5px; flex: 2 1 160px; }
+    .filter-row .fgr > div { flex: 1 1 74px; min-width: 70px; }
+    .filter-row .fq { flex: 1 1 90px; }
+    .filter-row select { padding-left: 6px !important; padding-right: 2px !important; }
+    .filter-row .fb { flex: 0 0 auto; }
+    .filter-row label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(11px, 3.2vw, 14px); }
+    .filter-row select, .filter-row input { width: 100%; min-width: 0; box-sizing: border-box; }
+    .filter-row .fb button { white-space: nowrap; }
+    .fit-box { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    .one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(10px, 2.9vw, 13px); }
+    .one-line .badge { padding: 1px 5px; font-size: .88em; }
+    .lst { width: 100%; table-layout: fixed; border-collapse: collapse; }
+    .lst td, .lst th { padding: 4px 3px; vertical-align: middle; overflow: hidden; }
+    .lst img.thumb { width: 32px; height: 32px; }
+    .cfi { border: 1px solid var(--border); border-radius: 8px; padding: 6px; margin-bottom: 6px; }
+    .cfi .l1, .cfi .l2 { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; }
+    .cfi .l2 { margin-top: 5px; }
+    .cfi .l1 .one-line { flex: 1 1 0; min-width: 0; }
+    .cfi .l2 input { flex: 1 1 0; min-width: 0; width: auto; }
+    .cfi .l2 > * { flex: 0 0 auto; }
+    .cfi .l2 > input { flex: 1 1 0; }
+    .cfi img.thumb { width: 32px; height: 32px; flex: 0 0 auto; }
+    .cfi.saved { background: #fef9c3; border-color: #facc15; }
+    .cfi { transition: opacity .6s ease, max-height .6s ease, margin .6s ease, padding .6s ease; }
+    .cfi.fade { opacity: 0; max-height: 0 !important; margin: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+    .cf-row { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 8px; flex-wrap: nowrap; }
+    .cf-row > .cf-field { flex: 1 1 0; min-width: 0; }
+    .cf-row > .cf-field label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(11px, 3.2vw, 14px); }
+    .cf-row > .cf-field input, .cf-row > .cf-field select { width: 100%; min-width: 0; box-sizing: border-box; }
+    .cf-section { font-weight: 700; font-size: .95em; margin: 12px 0 6px; color: #1e3a8a; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+    .row-one { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 8px; flex-wrap: nowrap; }
+    .row-one > div { flex: 1 1 0; min-width: 0; }
+    .row-one label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(11px, 3.2vw, 14px); }
+    .row-one input, .row-one select { width: 100%; min-width: 0; box-sizing: border-box; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
     label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
     input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'Sarabun', sans-serif; font-size: 16px; background: #fff; }
@@ -224,7 +262,6 @@
       button.btn.small { min-height: 30px; padding: 4px 9px; font-size: 0.8em; }
       .photo-grid { grid-template-columns: repeat(2, 1fr); }
       #photoLayout { flex-direction: column; gap: 10px; }
-      #photoStudentList { max-height: 38vh; overflow-y: auto; }
 
       /* --- Input / Select / Textarea ใช้ font 16px กัน iOS zoom --- */
       input, select, textarea { font-size: 16px; }
@@ -238,7 +275,7 @@
 
       /* --- แท็บจัดการรูปภาพ: list ซ้าย + detail ขวา → stack แนวตั้ง --- */
       #photoLayout { flex-direction: column; }
-      #photoStudentList { width: 100%; min-height: unset; max-height: 40vh; overflow-y: auto; }
+      #photoStudentList { width: 100%; min-height: unset; }
       #photoDetailPane { width: 100%; }
 
       /* --- Hint และ badge ลดขนาด --- */
@@ -270,6 +307,15 @@
       button.btn { font-size: 13px; }
     }
     @media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-height: 480px) { :root { --bn-h: 44px; } #mobileBottomNav .mob-icon { font-size: 15px !important; } #mobileBottomNav .mob-label { font-size: 9px !important; } }
+    @media (max-width: 767px) {
+      #photoListBox { flex: 0 0 auto !important; width: 100% !important; }
+      #photoDetailPane { display: none; }
+      #mobileBottomNav { height: calc(var(--bn-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
+      main { padding-bottom: calc(var(--bn-h) + 16px + env(safe-area-inset-bottom)) !important; }
+      body.app-on .modal-overlay { bottom: calc(var(--bn-h) + env(safe-area-inset-bottom)); }
+      body.app-on .modal-box { max-height: calc(100dvh - var(--bn-h) - env(safe-area-inset-bottom) - 8px); }
+    }
 
     @media print {
       body * { visibility: hidden; }
@@ -281,7 +327,7 @@
 <meta name="apple-mobile-web-app-title" content="DATA-STC.SCHOOL">
 <meta name="application-name" content="DATA-STC.SCHOOL">
 <script>
-var APP_VERSION='1.0.1', APP_VERSION_DATE='13/11/2569';
+var APP_VERSION='1.1.0', APP_VERSION_DATE='13/11/2569';
 document.addEventListener('DOMContentLoaded',function(){
   var t='เวอร์ชัน '+APP_VERSION+' ('+APP_VERSION_DATE+')';
   document.querySelectorAll('.app-version').forEach(function(e){e.textContent=t;});
@@ -368,18 +414,31 @@ if('serviceWorker' in navigator){
         </div>
 
         <div class="divider"></div>
-        <div class="grid">
+        <div class="row-one">
           <div><label>ระดับชั้น *</label><select id="pubRegGrade"></select></div>
           <div><label>ห้อง *</label><select id="pubRegRoom"></select></div>
-          <div><label>เบอร์โทรนักเรียน *</label><input id="pubRegPhone"></div>
         </div>
-        <div class="hint">รหัสชั่วคราวจะสร้างให้อัตโนมัติจากระดับชั้น+ห้อง ทุกช่องด้านล่างนี้ต้องกรอกให้ครบจึงบันทึกได้</div>
+        <div class="row-one">
+          <div><label>รหัสนักเรียน (ถ้ามี)</label><input id="pubRegRealId" inputmode="numeric" autocomplete="off"></div>
+          <div><label>เบอร์โทรนักเรียน *</label><input id="pubRegPhone" type="tel"></div>
+        </div>
+        <div class="hint">รหัสชั่วคราวจะสร้างให้อัตโนมัติจากระดับชั้น+ห้อง ทุกช่อง (ยกเว้นรหัสนักเรียน) ต้องกรอกให้ครบจึงบันทึกได้</div>
         <div class="divider"></div>
         <div id="pubRegCustomFieldsWrap"><div class="hint">กำลังโหลดแบบฟอร์ม...</div></div>
         <br>
         <button class="btn full" id="btnSubmitPublicRegister">บันทึกลงทะเบียน</button>
       </div>
 
+      <div id="pubRegIdAsk" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.55);align-items:center;justify-content:center;padding:16px;">
+        <div style="background:#fff;border-radius:14px;padding:18px;max-width:380px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3);">
+          <p style="margin:0 0 6px;font-weight:700;">ตรวจสอบรหัสนักเรียน</p>
+          <p style="margin:0 0 10px;">รหัสนักเรียนที่ท่านกรอก "<b id="pubRegIdAskVal"></b>" เป็นรหัสนักเรียนที่โรงเรียนออกให้ อยู่ในใบรายชื่อ ไม่ใช่รหัสตอนสมัครเข้าสอบ ถูกต้องหรือไม่?</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn" type="button" id="btnPubRegIdYes" style="flex:1;">ถูกต้อง ใช้ได้</button>
+            <button class="btn secondary" type="button" id="btnPubRegIdNo" style="flex:1;">ยังไม่ได้รับรหัสนักเรียน</button>
+          </div>
+        </div>
+      </div>
       <div id="pubRegSuccessView" style="display:none;">
         <h2>✅ ลงทะเบียนสำเร็จ!</h2>
         <div class="msg success" style="font-size:15px;line-height:1.8;">
@@ -517,6 +576,13 @@ if('serviceWorker' in navigator){
               </select>
             </div>
           </div>
+          <div class="grid" style="margin-top:10px;">
+            <div><label>หัวข้อกลุ่ม (เช่น ข้อมูลนักเรียน / ข้อมูลผู้ปกครอง)</label><input id="ffSection" list="ffSectionList" placeholder="เว้นว่างได้"><datalist id="ffSectionList"></datalist></div>
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ffSameRow" style="width:auto;"> อยู่แถวเดียวกับช่องก่อนหน้า</label>
+              <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ffIsName" style="width:auto;"> ใช้เป็นชื่อในรายชื่อ</label>
+            </div>
+          </div>
           <div id="ffOptionsWrap" style="display:none;margin-top:10px;">
             <label>รายการตัวเลือก (1 บรรทัด = 1 ตัวเลือก)</label>
             <textarea id="ffOptions" placeholder="เช่น&#10;ดีมาก&#10;ดี&#10;ปานกลาง"></textarea>
@@ -528,6 +594,7 @@ if('serviceWorker' in navigator){
 
         <div class="card">
           <h2>ช่องข้อมูลที่มีอยู่</h2>
+          <button class="btn small secondary" id="btnSeedFormFields" type="button">➕ สร้างชุดมาตรฐาน (คำนำหน้า/ชื่อ/สกุล/ผู้ปกครอง)</button>
           <div id="ffList" style="margin-top:14px;"></div>
         </div>
       </section>
@@ -582,17 +649,19 @@ if('serviceWorker' in navigator){
         <div class="card">
           <h2>จัดการรูปภาพนักเรียน</h2>
           <div class="hint" id="photoTeacherScopeHint" style="display:none;"></div>
-          <div class="grid" id="photoFilterWrap">
-            <div><label>ระดับชั้น</label><select id="photoFilterGrade"><option value="">ทั้งหมด</option></select></div>
-            <div><label>ห้อง</label><select id="photoFilterRoom"><option value="">ทั้งหมด</option></select></div>
-            <div><label>ค้นหารหัส</label><input id="photoFilterQuery" placeholder="พิมพ์เพื่อค้นหา..."></div>
+          <div class="filter-row">
+            <div class="fgr" id="photoFilterWrap">
+              <div><label>ชั้น</label><select id="photoFilterGrade"><option value="">ทั้งหมด</option></select></div>
+              <div><label>ห้อง</label><select id="photoFilterRoom"><option value="">ทั้งหมด</option></select></div>
+            </div>
+            <div class="fq"><label>ค้นหา</label><input id="photoFilterQuery"></div>
+            <div class="fb"><button class="btn secondary small" id="btnPhotoListSearch">ค้นหา</button></div>
           </div>
-          <br>
-          <button class="btn secondary small" id="btnPhotoListSearch">ค้นหา</button>
-          <div class="hint" style="font-size:11px;">บนมือถือ: เลือกชั้น/ห้องแล้วระบบจะค้นหาให้อัตโนมัติ</div>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;"><input type="checkbox" id="photoShowAll" style="width:auto;"> แสดงทั้งหมด (รวมที่มีรูปแล้ว)</label>
+          <div class="hint" style="font-size:11px;">ยังไม่เลือกอะไร จะแสดงเฉพาะรายชื่อที่ยังไม่มีรูป</div>
 
           <div id="photoLayout" style="display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;">
-            <div style="flex:0 1 260px; min-width:220px; min-height:60px; max-height:60vh; overflow-y:auto;">
+            <div class="fit-box" id="photoListBox" style="flex:0 1 430px; min-width:0; width:100%; min-height:120px;">
               <div id="photoStudentList" class="hint">กดค้นหาเพื่อแสดงรายชื่อ</div>
             </div>
             <div style="flex:1 1 320px; min-width:260px;">
@@ -615,14 +684,15 @@ if('serviceWorker' in navigator){
         <div class="subpanel active" id="sub-searchEdit">
           <div class="card">
             <h2>ค้นหา / รายชื่อนักเรียนทั้งหมด</h2>
-            <div class="grid">
-              <div><label>คำค้นหา (ชื่อ/รหัส)</label><input id="searchQuery" placeholder="พิมพ์เพื่อค้นหา..."></div>
-              <div><label>ระดับชั้น</label><select id="searchGrade"><option value="">ทั้งหมด</option></select></div>
-              <div><label>ห้อง</label><select id="searchRoom"><option value="">ทั้งหมด</option></select></div>
+            <div class="filter-row">
+              <div class="fgr">
+                <div><label>ชั้น</label><select id="searchGrade"><option value="">ทั้งหมด</option></select></div>
+                <div><label>ห้อง</label><select id="searchRoom"><option value="">ทั้งหมด</option></select></div>
+              </div>
+              <div class="fq"><label>ค้นหา (ชื่อ/รหัส)</label><input id="searchQuery"></div>
+              <div class="fb"><button class="btn small" id="btnSearch">ค้นหา</button></div>
             </div>
-            <br>
-            <button class="btn" id="btnSearch">ค้นหา</button>
-            <div id="searchResults" style="margin-top:16px;"></div>
+            <div id="searchResults" class="fit-box" style="margin-top:10px;"></div>
             <div class="divider" id="adminDeleteZoneDivider" style="display:none;"></div>
             <div id="adminDeleteZone" style="display:none;">
               <button class="btn danger" id="btnDeleteFilteredStudents" style="margin-right:8px;">🗑️ ลบเฉพาะรายการที่กรองไว้</button>
@@ -636,15 +706,19 @@ if('serviceWorker' in navigator){
         <div class="subpanel" id="sub-confirm">
           <div class="card">
             <h2>จัดการรหัสนักเรียนจริง</h2>
-            <div class="hint">แสดงนักเรียนทุกคน (กรองชั้น/ห้องได้) — กรอกรหัสจริงแล้วกด "บันทึก" เพื่อยืนยัน/แก้ไข หรือลบข้อความให้ว่างแล้วกด "บันทึก" เพื่อยกเลิกรหัสจริง (กลับไปใช้รหัสชั่วคราว) ระบบจะเปลี่ยนชื่อไฟล์รูปเดิม (ตำแหน่งเดิม) ให้ตรงกับรหัสที่ใช้งานล่าสุดทันที</div>
+            <div class="hint">กรอกรหัสจริงแล้วกด "บันทึก" เพื่อยืนยัน/แก้ไข หรือลบให้ว่างแล้วกด "บันทึก" เพื่อยกเลิก (กลับไปใช้รหัสชั่วคราว) ช่องที่ขอบสีส้ม = รหัสที่นักเรียนกรอกเองตอนลงทะเบียน (รอยืนยัน)</div>
             <br>
-            <div class="grid" id="confirmFilterWrap">
-              <div><label>ระดับชั้น</label><select id="confirmFilterGrade"><option value="">ทั้งหมด</option></select></div>
-              <div><label>ห้อง</label><select id="confirmFilterRoom"><option value="">ทั้งหมด</option></select></div>
+            <div class="filter-row">
+              <div class="fgr" id="confirmFilterWrap">
+                <div><label>ชั้น</label><select id="confirmFilterGrade"><option value="">ทั้งหมด</option></select></div>
+                <div><label>ห้อง</label><select id="confirmFilterRoom"><option value="">ทั้งหมด</option></select></div>
+              </div>
+              <div class="fq"><label>ค้นหา</label><input id="confirmFilterQuery"></div>
+              <div class="fb"><button class="btn small" id="btnRefreshConfirm">ค้นหา</button></div>
             </div>
-            <br>
-            <button class="btn secondary small" id="btnRefreshConfirm">ค้นหา / รีเฟรชรายการ</button>
-            <div id="confirmList" style="margin-top:14px;"></div>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;"><input type="checkbox" id="confirmShowAll" style="width:auto;"> แสดงทั้งหมด (รวมที่มีรหัสจริงแล้ว)</label>
+            <div class="hint" style="font-size:11px;">ยังไม่เลือกอะไร จะแสดงเฉพาะรายชื่อที่ยังไม่มีรหัสจริง</div>
+            <div id="confirmList" class="fit-box" style="margin-top:10px;"></div>
           </div>
         </div>
 
@@ -652,14 +726,15 @@ if('serviceWorker' in navigator){
         <div class="subpanel" id="sub-move">
           <div class="card">
             <h2>ค้นหานักเรียนที่ต้องการย้ายห้อง</h2>
-            <div class="grid" id="moveFilterWrap">
-              <div><label>ระดับชั้นปัจจุบัน</label><select id="moveFilterGrade"><option value="">ทั้งหมด</option></select></div>
-              <div><label>ห้องปัจจุบัน</label><select id="moveFilterRoom"><option value="">ทั้งหมด</option></select></div>
-              <div><label>ค้นหารหัส</label><input id="moveSearch" placeholder="ค้นหารหัส..."></div>
+            <div class="filter-row">
+              <div class="fgr" id="moveFilterWrap">
+                <div><label>ชั้น</label><select id="moveFilterGrade"><option value="">ทั้งหมด</option></select></div>
+                <div><label>ห้อง</label><select id="moveFilterRoom"><option value="">ทั้งหมด</option></select></div>
+              </div>
+              <div class="fq"><label>ค้นหา</label><input id="moveSearch"></div>
+              <div class="fb"><button class="btn small" id="btnMoveSearch">ค้นหา</button></div>
             </div>
-            <br>
-            <button class="btn secondary small" id="btnMoveSearch">ค้นหา</button>
-            <div id="moveResults" style="margin-top:14px;"></div>
+            <div id="moveResults" class="fit-box" style="margin-top:10px;"></div>
           </div>
         </div>
 
@@ -1085,7 +1160,7 @@ if('serviceWorker' in navigator){
     }
 
     /** merge รายการใหม่เข้า table ที่มี data-id แบบ surgical — ไม่ redraw ทั้ง table ไม่กระพริบ */
-    function silentMergeTable_(tableEl, newList, buildRowHtml, getId, getHash) {
+    function silentMergeTable_(tableEl, newList, buildRowHtml, getId, getHash, noRemove) {
       if (!tableEl) return;
       var tbody = tableEl.querySelector('tbody') || tableEl;
       var existingRows = {};
@@ -1111,7 +1186,7 @@ if('serviceWorker' in navigator){
           tbody.appendChild(addRow);
         }
       });
-      Object.keys(existingRows).forEach(function (id) {
+      if (!noRemove) Object.keys(existingRows).forEach(function (id) {
         if (!newIds[id]) existingRows[id].remove();
       });
     }
@@ -1120,21 +1195,10 @@ if('serviceWorker' in navigator){
       lastSearchResults = newList;
       var tableEl = document.querySelector('#searchResults table');
       if (!tableEl) return;
-      var delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
       silentMergeTable_(tableEl, newList,
-        function (s) {
-          var hash = [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room].join('|');
-          return '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '">' +
-            '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-            '<td style="white-space:nowrap;">' + codesAndNameRow(s) + '</td>' +
-            '<td>' + statusBadge(s) + '</td>' +
-            '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
-            '<td><button class="btn small" onclick="openEdit(\'' + escapeJs(s.id) + '\')">แก้ไข</button> ' +
-            '<button class="btn small danger" onclick="deleteRow(\'' + escapeJs(s.id) + '\', this)">' + delLabel + '</button></td>' +
-            '</tr>';
-        },
+        function (s) { return searchRowHtml(s); },
         function (s) { return s.id; },
-        function (s) { return escapeHtml([s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room].join('|')); }
+        function (s) { return [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room, fullNameOf_(s.customFields)].join('|'); }
       );
     }
 
@@ -1143,15 +1207,10 @@ if('serviceWorker' in navigator){
       var tableEl = document.querySelector('#photoStudentList table');
       if (!tableEl) return;
       silentMergeTable_(tableEl, newList,
-        function (s) {
-          var hash = [s.photoUrl, s.photoStatus].join('|');
-          return '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '" style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
-            '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-            '<td style="font-size:11px;word-break:break-word;">' + codesAndNameRow(s, true) + '</td>' +
-            '</tr>';
-        },
+        function (s) { return photoRowHtml_(s); },
         function (s) { return s.id; },
-        function (s) { return escapeHtml([s.photoUrl, s.photoStatus].join('|')); }
+        function (s) { return [s.photoUrl, s.photoStatus, fullNameOf_(s.customFields)].join('|'); },
+        photoFilterIsDefault_()  // โหมดเริ่มต้น (เฉพาะที่ยังไม่มีรูป): เพิ่มแถวใหม่ได้ แต่ไม่ลบแถวที่เพิ่งใส่รูปให้หายกลางคัน
       );
     }
 
@@ -1178,17 +1237,36 @@ if('serviceWorker' in navigator){
         } else { _pollBusy = false; }
 
       } else if (pid === 'panel-photos' && photoListCache.length) {
-        var pg = document.getElementById('photoFilterGrade') ? document.getElementById('photoFilterGrade').value : '';
-        var pr = document.getElementById('photoFilterRoom') ? document.getElementById('photoFilterRoom').value : '';
         google.script.run
           .withSuccessHandler(function (list) { silentPollPhotoList_(list); _pollBusy = false; })
           .withFailureHandler(function () { _pollBusy = false; })
-          .listPendingPhotos(TOKEN);
+          .listStudents(TOKEN, photoFilter_());
 
       } else { _pollBusy = false; }
     }
 
     setInterval(runBackgroundPoll_, 45000);
+
+    /** ปรับความสูงกรอบรายชื่อให้พอดีจอ: เลื่อนเฉพาะในกรอบ ไม่ล้นลงไปใต้แถบเมนูด้านล่าง */
+    function fitBoxes_(settled) {
+      if (settled !== true) setTimeout(function () { fitBoxes_(true); }, 200);   // คำนวณซ้ำหลัง layout นิ่ง
+      var nav = document.getElementById('mobileBottomNav');
+      var navH = (nav && getComputedStyle(nav).display !== 'none') ? nav.offsetHeight : 0;
+      var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.querySelectorAll('.fit-box').forEach(function (el) {
+        if (!el.offsetParent) return;                       // แท็บที่ซ่อนอยู่
+        var top = el.getBoundingClientRect().top;
+        var h = Math.max(90, vh - top - navH - 14);
+        el.style.maxHeight = h + 'px';
+      });
+    }
+    window.addEventListener('resize', function () { fitBoxes_(true); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { fitBoxes_(true); }, 250); });
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { fitBoxes_(true); });
+    document.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('nav, .subnav, #mobileBottomNav, .filter-row, #photoShowAll, #confirmShowAll')) setTimeout(fitBoxes_, 120);
+    });
+    window.addEventListener('scroll', function () { clearTimeout(window._fitT); window._fitT = setTimeout(function () { fitBoxes_(true); }, 150); }, { passive: true });
 
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
@@ -1219,18 +1297,29 @@ if('serviceWorker' in navigator){
       return html;
     }
     /** รหัสนักเรียน(ชั่วคราว) + รหัสจริง + ชื่อ + นามสกุล อยู่แถวเดียวกันเสมอ ไม่ตัดบรรทัด */
+    function fullNameOf_(customFields) {
+      if (!customFields || !formFields.length) return '';
+      const flagged = formFields.filter(function (f) { return f.isName && !fieldIsFile(f); });
+      if (flagged.length) {
+        return flagged.map(function (f) { return customFields[f.id] || ''; }).filter(Boolean).join(' ');
+      }
+      return [guessFieldByLabel_(customFields, 'ชื่อ'), guessFieldByLabel_(customFields, 'นามสกุล')].filter(Boolean).join(' ');
+    }
     function codesAndNameRow(s, allowWrap) {
-      const nameVal = guessFieldByLabel_(s.customFields, 'ชื่อ');
-      const lastNameVal = guessFieldByLabel_(s.customFields, 'นามสกุล');
       const wrapStyle = allowWrap ? '' : 'white-space:nowrap;';
-      let html = '<span style="' + wrapStyle + '">' + bothCodesFor(s) +
-        (nameVal ? ' ' + escapeHtml(nameVal) : '') +
-        (lastNameVal ? ' ' + escapeHtml(lastNameVal) : '') + '</span>';
-      return html;
+      const nm = fullNameOf_(s.customFields);
+      return '<span style="' + wrapStyle + '">' + bothCodesFor(s) + (nm ? ' ' + escapeHtml(nm) : '') + '</span>';
+    }
+    /** รหัสชั่วคราว + รหัสจริง + ชื่อ นามสกุล แบบกะทัดรัด อยู่แถวเดียวกัน (ใช้ในรายการที่ต้องไม่ล้นจอ) */
+    function codesCompact(s) {
+      const nm = fullNameOf_(s.customFields);
+      return '<span class="badge temp" title="รหัสชั่วคราว">' + escapeHtml(s.tempId) + '</span> ' +
+        (s.realId ? '<span class="badge real" title="รหัสจริง">' + escapeHtml(s.realId) + '</span> ' : '') +
+        (nm ? escapeHtml(nm) : '');
     }
     function guessFieldByLabel_(customFields, keyword) {
       if (!customFields || !formFields.length) return '';
-      const f = formFields.filter(function (x) { return !fieldIsFile(x) && x.label.indexOf(keyword) !== -1; })[0];
+      const f = formFields.filter(function (x) { return !fieldIsFile(x) && x.label.indexOf('ผู้ปกครอง') === -1 && x.label.indexOf(keyword) !== -1 && (keyword !== 'ชื่อ' || x.label.indexOf('นามสกุล') === -1); })[0];
       return (f && customFields[f.id]) ? customFields[f.id] : '';
     }
     /** สรุปค่าฟิลด์เพิ่มเติมทั้งหมด (ไม่รวมไฟล์/รูป) เป็นข้อความเดียว เช่น "ชื่อ: สมชาย | เบอร์โทร: 0812345678" */
@@ -1311,6 +1400,7 @@ if('serviceWorker' in navigator){
     }
 
     document.getElementById('btnLogout').addEventListener('click', function () {
+      document.body.classList.remove('app-on');
       google.script.run.logout(TOKEN);
       sessionStorage.clear();
       TOKEN = null; ROLE = null; MY_SCOPE = null;
@@ -1336,6 +1426,7 @@ if('serviceWorker' in navigator){
     // SHOW APP
     // ---------------------------------------------------------------
     function showApp() {
+      document.body.classList.add('app-on');
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appScreen').style.display = 'block';
       document.getElementById('userLabel').textContent = DISPLAY_NAME + ' (' + (ROLE_THAI[ROLE] || ROLE) + ')';
@@ -1456,22 +1547,35 @@ if('serviceWorker' in navigator){
       const container = document.getElementById(containerId);
       const visibleFields = hidePhoneType ? fields.filter(function (f) { return f.type !== 'phone'; }) : fields;
       if (!visibleFields.length) { container.innerHTML = '<div class="hint">ยังไม่มีช่องข้อมูลเพิ่มเติม (ไปเพิ่มได้ที่แท็บ "จัดการฟอร์มข้อมูล")</div>'; return; }
-      let html = '';
-      visibleFields.forEach(function (f) {
+      function fieldHtml(f) {
         const val = existingValues[f.id] || '';
-        html += '<div class="cf-field"><label>' + escapeHtml(f.label) + '</label>';
+        let h = '<div class="cf-field"><label title="' + escapeHtml(f.label) + '">' + escapeHtml(f.label) + '</label>';
         if (f.type === 'dropdown') {
-          html += '<select class="cfInput" data-field="' + f.id + '"><option value="">- เลือก -</option>';
+          h += '<select class="cfInput" data-field="' + f.id + '"><option value="">- เลือก -</option>';
           (f.options || []).forEach(function (opt) {
-            html += '<option value="' + escapeHtml(opt) + '"' + (val === opt ? ' selected' : '') + '>' + escapeHtml(opt) + '</option>';
+            h += '<option value="' + escapeHtml(opt) + '"' + (val === opt ? ' selected' : '') + '>' + escapeHtml(opt) + '</option>';
           });
-          html += '</select>';
+          h += '</select>';
         } else {
           const inputType = (f.type === 'number') ? 'number' : (f.type === 'phone' ? 'tel' : 'text');
-          html += '<input type="' + inputType + '" class="cfInput" data-field="' + f.id + '" value="' + escapeHtml(val) + '">';
+          h += '<input type="' + inputType + '" class="cfInput" data-field="' + f.id + '" value="' + escapeHtml(val) + '">';
         }
-        html += '</div>';
+        return h + '</div>';
+      }
+      let html = '', open = false, lastSection = null;
+      visibleFields.forEach(function (f, i) {
+        const sec = f.section || '';
+        const sectionChanged = (i === 0 ? !!sec : sec !== lastSection);
+        const startNew = (i === 0) || !f.sameRow || sectionChanged;
+        if (startNew) {
+          if (open) html += '</div>';
+          if (sectionChanged && sec) html += '<div class="cf-section">' + escapeHtml(sec) + '</div>';
+          html += '<div class="cf-row">'; open = true;
+        }
+        lastSection = sec;
+        html += fieldHtml(f);
       });
+      if (open) html += '</div>';
       container.innerHTML = html;
     }
     function collectCustomFieldValues(containerId) {
@@ -1543,8 +1647,10 @@ if('serviceWorker' in navigator){
 
     function renderFormFieldsList(fields) {
       const container = document.getElementById('ffList');
+      const dl = document.getElementById('ffSectionList');
+      if (dl) dl.innerHTML = Array.from(new Set(fields.map(function (f) { return f.section; }).filter(Boolean))).map(function (x) { return '<option value="' + escapeHtml(x) + '">'; }).join('');
       if (!fields.length) { container.innerHTML = '<div class="empty">ยังไม่มีช่องข้อมูลเพิ่มเติม</div>'; return; }
-      let html = '<div class="table-scroll"><table><tr><th>ลำดับ</th><th></th><th>ชื่อช่อง</th><th>ประเภท</th><th>ตัวเลือก</th><th></th></tr>';
+      let html = '<div class="table-scroll"><table><tr><th>ลำดับ</th><th></th><th>ชื่อช่อง</th><th>ประเภท</th><th>ตัวเลือก</th><th>กลุ่ม/จัดวาง</th><th></th></tr>';
       fields.forEach(function (f, idx) {
         const upDisabled = (idx === 0) ? 'disabled' : '';
         const downDisabled = (idx === fields.length - 1) ? 'disabled' : '';
@@ -1557,6 +1663,7 @@ if('serviceWorker' in navigator){
           '<td>' + escapeHtml(f.label) + '</td>' +
           '<td><span class="badge type">' + escapeHtml(FIELD_TYPE_LABELS[f.type] || f.type) + '</span></td>' +
           '<td>' + (f.options && f.options.length ? escapeHtml(f.options.join(', ')) : '-') + '</td>' +
+          '<td style="font-size:.85em;">' + escapeHtml(f.section || '-') + (f.sameRow ? ' · แถวเดียวกัน' : '') + (f.isName ? ' · ชื่อ' : '') + '</td>' +
           '<td>' +
             '<button class="btn small" onclick="editField(\'' + escapeJs(f.id) + '\')">แก้ไข</button> ' +
             '<button class="btn small danger" onclick="deleteField(\'' + escapeJs(f.id) + '\')">ลบ</button>' +
@@ -1583,6 +1690,9 @@ if('serviceWorker' in navigator){
       document.getElementById('ffType').value = f.type;
       document.getElementById('ffOptionsWrap').style.display = (f.type === 'dropdown') ? 'block' : 'none';
       document.getElementById('ffOptions').value = (f.options || []).join('\n');
+      document.getElementById('ffSection').value = f.section || '';
+      document.getElementById('ffSameRow').checked = !!f.sameRow;
+      document.getElementById('ffIsName').checked = !!f.isName;
       document.getElementById('btnSaveField').textContent = 'บันทึกการแก้ไข';
       document.getElementById('btnCancelEditField').style.display = 'inline-block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1596,6 +1706,9 @@ if('serviceWorker' in navigator){
       document.getElementById('ffType').value = 'text';
       document.getElementById('ffOptionsWrap').style.display = 'none';
       document.getElementById('ffOptions').value = '';
+      document.getElementById('ffSection').value = '';
+      document.getElementById('ffSameRow').checked = false;
+      document.getElementById('ffIsName').checked = false;
       document.getElementById('btnSaveField').textContent = 'เพิ่มช่องข้อมูล';
       document.getElementById('btnCancelEditField').style.display = 'none';
     }
@@ -1607,12 +1720,13 @@ if('serviceWorker' in navigator){
       if (!label) { showMsg('ffMsg', 'กรุณาระบุชื่อช่องข้อมูล', 'error'); return; }
       if (type === 'dropdown' && !options.length) { showMsg('ffMsg', 'กรุณาเพิ่มรายการตัวเลือกอย่างน้อย 1 รายการ', 'error'); return; }
 
+      const layout = { section: document.getElementById('ffSection').value.trim(), sameRow: document.getElementById('ffSameRow').checked, isName: document.getElementById('ffIsName').checked };
       const btn = document.getElementById('btnSaveField');
       btn.disabled = true;
       const isEdit = !!editingFieldId;
       const call = isEdit
-        ? google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminUpdateFormField(TOKEN, editingFieldId, label, type, options)
-        : google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminAddFormField(TOKEN, label, type, options);
+        ? google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminUpdateFormField(TOKEN, editingFieldId, label, type, options, layout)
+        : google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFail).adminAddFormField(TOKEN, label, type, options, layout);
 
       function onSaved() {
         btn.disabled = false;
@@ -1624,6 +1738,17 @@ if('serviceWorker' in navigator){
         btn.disabled = false;
         if (!handleAuthError(err)) showMsg('ffMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
       }
+    });
+
+    document.getElementById('btnSeedFormFields').addEventListener('click', function () {
+      if (!confirm('สร้างชุดมาตรฐาน: คำนำหน้า, ชื่อ, นามสกุล, ข้อมูลผู้ปกครอง (ข้ามช่องที่มีชื่อซ้ำอยู่แล้ว ไม่แก้ไข/ไม่ลบช่องเดิม) ดำเนินการ?')) return;
+      google.script.run
+        .withSuccessHandler(function (r) {
+          showMsg('ffMsg', 'สร้างแล้ว ' + r.created.length + ' ช่อง' + (r.skipped.length ? ' (ข้ามที่มีอยู่แล้ว: ' + r.skipped.join(', ') + ')' : ''), 'success');
+          loadFormFieldsList();
+        })
+        .withFailureHandler(function (err) { if (!handleAuthError(err)) showMsg('ffMsg', 'เกิดข้อผิดพลาด: ' + err.message, 'error'); })
+        .adminSeedStandardFormFields(TOKEN);
     });
 
     function deleteField(fieldId) {
@@ -1805,41 +1930,50 @@ if('serviceWorker' in navigator){
       });
     });
 
-    function searchPhotoList() {
+    function photoFilterIsDefault_() {
+      const q = document.getElementById('photoFilterQuery').value.trim();
+      const g = ROLE === 'admin' ? document.getElementById('photoFilterGrade').value : '';
+      const r = ROLE === 'admin' ? document.getElementById('photoFilterRoom').value : '';
+      return !document.getElementById('photoShowAll').checked && !q && !g && !r;
+    }
+    function photoFilter_() {
       const filter = { query: document.getElementById('photoFilterQuery').value.trim() };
       if (ROLE === 'admin') {
         filter.grade = document.getElementById('photoFilterGrade').value;
         filter.room = document.getElementById('photoFilterRoom').value;
       }
+      if (photoFilterIsDefault_()) filter.onlyNoPhoto = true;   // ยังไม่เลือกอะไร = เฉพาะที่ยังไม่มีรูป
+      return filter;
+    }
+    document.getElementById('photoShowAll').addEventListener('change', searchPhotoList);
+
+    function searchPhotoList() {
       const container = document.getElementById('photoStudentList');
       container.innerHTML = '<div class="loading">กำลังค้นหา...</div>';
       google.script.run
         .withSuccessHandler(renderPhotoList)
         .withFailureHandler(function (err) { if (!handleAuthError(err)) container.innerHTML = '<div class="msg error">' + escapeHtml(err.message) + '</div>'; })
-        .listStudents(TOKEN, filter);
+        .listStudents(TOKEN, photoFilter_());
     }
 
     function guessNameFor(customFields) {
-      if (!customFields || !formFields.length) return '';
-      const nameField = formFields.filter(function (f) { return !fieldIsFile(f) && f.label.indexOf('ชื่อ') !== -1; })[0];
-      return (nameField && customFields[nameField.id]) ? customFields[nameField.id] : '';
+      return fullNameOf_(customFields);
+    }
+
+    function photoRowHtml_(s) {
+      const hash = [s.photoUrl, s.photoStatus, fullNameOf_(s.customFields)].join('|');
+      return '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '" style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
+        '<td style="width:38px;">' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+        '<td><div class="one-line">' + codesCompact(s) + '</div>' +
+        '<div class="one-line" style="color:var(--muted);">' + statusBadge(s) + ' ' + escapeHtml(s.grade + '/' + s.room) + '</div></td></tr>';
     }
 
     function renderPhotoList(list) {
       photoListCache = list;
       const container = document.getElementById('photoStudentList');
-      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<table style="table-layout:fixed;"><tr><th style="width:42px;">รูป</th><th>รหัส / ชื่อ</th><th style="width:54px;font-size:10px;">ชั้น/ห้อง</th></tr>';
-      list.forEach(function (s) {
-        const hash = [s.photoUrl, s.photoStatus].join('|');
-        html += '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '" style="cursor:pointer;" onclick="selectPhotoStudent(\'' + escapeJs(s.id) + '\')">' +
-          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td style="font-size:11px;word-break:break-word;">' + codesAndNameRow(s, true) + '</td>' +
-          '<td style="font-size:10px;color:var(--muted);">' + escapeHtml(s.grade) + '<br>ห้อง ' + escapeHtml(s.room) + '</td>' +
-          '</tr>';
-      });
-      html += '</table>';
-      container.innerHTML = html;
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ' + (photoFilterIsDefault_() ? ' (ทุกคนมีรูปแล้ว — ติ๊ก "แสดงทั้งหมด" เพื่อดูทั้งหมด)' : '') + '</div>'; fitBoxes_(); return; }
+      container.innerHTML = '<table class="lst">' + list.map(photoRowHtml_).join('') + '</table>';
+      fitBoxes_();
     }
 
     function selectPhotoStudent(id) {
@@ -1851,9 +1985,9 @@ if('serviceWorker' in navigator){
         : document.getElementById('photoDetailPane');
 
       const html =
-        '<p style="margin:0 0 10px;"><b>ชั้น/ห้อง:</b> ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</p>' +
         '<p style="font-size:13px;">' + formatCustomFieldsSummary(s.customFields, s.phone) + '</p>' +
-        '<button class="btn small secondary" id="btnEditFromPhoto">📝 แก้ไขข้อมูล</button>' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:nowrap;"><button class="btn small secondary" id="btnEditFromPhoto">📝 แก้ไขข้อมูล</button>' +
+        '<span style="white-space:nowrap;font-size:13px;"><b>ชั้น/ห้อง:</b> ' + escapeHtml(s.grade + ' / ห้อง ' + s.room) + '</span></div>' +
         '<div class="divider"></div>' +
         (s.photoUrl ? '<img class="photo-preview" id="photoDetailPreview" src="' + s.photoUrl + '">' : '<div class="photo-preview" id="photoDetailPreview"></div>') +
         '<p class="hint">ชื่อไฟล์ที่ใช้อยู่ตอนนี้: ' + escapeHtml(s.photoFile || '(ยังไม่มีรูป)') + '</p>' +
@@ -1920,27 +2054,24 @@ if('serviceWorker' in navigator){
     });
 
     let lastSearchResults = [];
+    function searchRowHtml(s) {
+      const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
+      const hash = [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room, fullNameOf_(s.customFields)].join('|');
+      return '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '">' +
+        '<td style="width:38px;">' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+        '<td><div class="one-line">' + codesCompact(s) + '</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-top:3px;">' +
+            '<span class="one-line" style="flex:1 1 0;min-width:0;color:var(--muted);">' + statusBadge(s) + ' ' + escapeHtml(s.grade + '/' + s.room) + '</span>' +
+            '<button class="btn small" onclick="openEdit(\'' + escapeJs(s.id) + '\')">แก้ไข</button>' +
+            '<button class="btn small danger" onclick="deleteRow(\'' + escapeJs(s.id) + '\', this)">' + delLabel + '</button>' +
+          '</div></td></tr>';
+    }
     function renderSearchResults(list) {
       lastSearchResults = list;
       const container = document.getElementById('searchResults');
-      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
-      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>จัดการ</th></tr>';
-      list.forEach(function (s) {
-        const hash = [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room].join('|');
-        html += '<tr data-id="' + s.id + '" data-hash="' + escapeHtml(hash) + '">' +
-          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td style="white-space:nowrap;">' + codesAndNameRow(s) + '</td>' +
-          '<td>' + statusBadge(s) + '</td>' +
-          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
-          '<td>' +
-            '<button class="btn small" onclick="openEdit(\'' + escapeJs(s.id) + '\')">แก้ไข</button> ' +
-            '<button class="btn small danger" onclick="deleteRow(\'' + escapeJs(s.id) + '\', this)">' + delLabel + '</button>' +
-          '</td>' +
-          '</tr>';
-      });
-      html += '</table></div>';
-      container.innerHTML = html;
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; fitBoxes_(); return; }
+      container.innerHTML = '<table class="lst">' + list.map(searchRowHtml).join('') + '</table>';
+      fitBoxes_();
     }
 
     function deleteRow(id, btnEl) {
@@ -2130,12 +2261,25 @@ if('serviceWorker' in navigator){
     // ===================================================================
     // TAB: จัดการข้อมูล > ยืนยันรหัสจริง (admin/teacher)
     // ===================================================================
+    let confirmDefaultMode = true;
+    let confirmSaved = null;   // { el, timer } แถวที่เพิ่งบันทึก (ไฮไลต์ไว้ประมาณ 30 วินาที)
+
+    function confirmFilterIsDefault_() {
+      const q = document.getElementById('confirmFilterQuery').value.trim();
+      const g = document.getElementById('confirmFilterGrade').value;
+      const r = document.getElementById('confirmFilterRoom').value;
+      return !document.getElementById('confirmShowAll').checked && !q && !g && !r;
+    }
     function loadConfirmList() {
+      confirmDefaultMode = confirmFilterIsDefault_();
       const filter = {
+        query: document.getElementById('confirmFilterQuery').value.trim(),
         grade: document.getElementById('confirmFilterGrade').value,
         room: document.getElementById('confirmFilterRoom').value
       };
+      if (confirmDefaultMode) filter.onlyTemp = true;   // ยังไม่เลือกอะไร = เฉพาะที่ยังไม่มีรหัสจริง
       const container = document.getElementById('confirmList');
+      confirmSaved = null;
       container.innerHTML = '<div class="loading">กำลังโหลด...</div>';
       google.script.run
         .withSuccessHandler(renderConfirmList)
@@ -2143,24 +2287,42 @@ if('serviceWorker' in navigator){
         .listStudents(TOKEN, filter);
     }
     document.getElementById('btnRefreshConfirm').addEventListener('click', loadConfirmList);
+    document.getElementById('confirmShowAll').addEventListener('change', loadConfirmList);
 
+    function confirmItemHtml_(s) {
+      const prefill = s.realId || s.claimedRealId || '';
+      const cls = s.realId ? ' confirmed-input' : '';
+      const claimedNote = (!s.realId && s.claimedRealId) ? ' title="รหัสที่นักเรียนกรอกเองตอนลงทะเบียน (รอยืนยัน)" style="border-color:#f59e0b;"' : '';
+      return '<div class="cfi" data-id="' + s.id + '">' +
+        '<div class="l1">' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '<span style="width:32px;flex:0 0 auto;text-align:center;">-</span>') +
+        '<div class="one-line">' + codesCompact(s) + '</div></div>' +
+        '<div class="l2"><span class="one-line" style="flex:0 0 auto;">' + statusBadge(s) + '</span>' +
+        '<span class="one-line" style="flex:0 0 auto;color:var(--muted);">' + escapeHtml(s.grade + '/' + s.room) + '</span>' +
+        '<input type="text" class="realIdInput' + cls + '" data-id="' + s.id + '" value="' + escapeHtml(prefill) + '" placeholder="รหัสจริง"' + claimedNote + '>' +
+        '<button class="btn small" onclick="confirmReal(\'' + escapeJs(s.id) + '\', this)">บันทึก</button></div>' +
+        '</div>';
+    }
     function renderConfirmList(list) {
       const container = document.getElementById('confirmList');
-      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>สถานะรูป</th><th>ชั้น/ห้อง</th><th>รหัสจริง (ลบให้ว่างเพื่อยกเลิก)</th></tr>';
-      list.forEach(function (s) {
-        const confirmedClass = s.realId ? ' confirmed-input' : '';
-        html += '<tr>' +
-          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
-          '<td>' + statusBadge(s) + '</td>' +
-          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
-          '<td class="inline-form"><input type="text" class="realIdInput' + confirmedClass + '" data-id="' + s.id + '" value="' + escapeHtml(s.realId) + '" placeholder="(ไม่มีรหัสจริง)">' +
-          '<button class="btn small" onclick="confirmReal(\'' + escapeJs(s.id) + '\', this)">บันทึก</button></td>' +
-          '</tr>';
-      });
-      html += '</table></div>';
-      container.innerHTML = html;
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ' + (confirmDefaultMode ? ' (ทุกคนมีรหัสจริงแล้ว — ติ๊ก "แสดงทั้งหมด" เพื่อดูทั้งหมด)' : '') + '</div>'; fitBoxes_(); return; }
+      container.innerHTML = list.map(confirmItemHtml_).join('');
+      fitBoxes_();
+    }
+
+    /** จบการไฮไลต์แถวที่บันทึกก่อนหน้า: โหมดเริ่มต้น + มีรหัสจริงแล้ว = ค่อยๆ จางหายไป, โหมดอื่น = แค่เอาไฮไลต์ออก */
+    function finalizeConfirmSaved_() {
+      if (!confirmSaved) return;
+      const cs = confirmSaved; confirmSaved = null;
+      clearTimeout(cs.timer);
+      if (!cs.el || !cs.el.isConnected) return;
+      if (confirmDefaultMode && cs.hasReal) {
+        cs.el.style.maxHeight = cs.el.offsetHeight + 'px';
+        void cs.el.offsetHeight;
+        cs.el.classList.add('fade');
+        setTimeout(function () { if (cs.el.parentNode) cs.el.remove(); }, 700);
+      } else {
+        cs.el.classList.remove('saved');
+      }
     }
 
     function confirmReal(id, btnEl) {
@@ -2169,7 +2331,17 @@ if('serviceWorker' in navigator){
       if (!confirm(val ? ('ยืนยันบันทึกรหัสจริงเป็น "' + val + '" ?') : 'ยืนยันลบรหัสจริง (กลับไปใช้รหัสชั่วคราว)?')) return;
       btnEl.disabled = true; btnEl.textContent = '...';
       google.script.run
-        .withSuccessHandler(function () { loadConfirmList(); })
+        .withSuccessHandler(function () {
+          btnEl.disabled = false; btnEl.textContent = 'บันทึก';
+          finalizeConfirmSaved_();                       // คนก่อนหน้าหายไปอย่างนุ่มนวล
+          const el = btnEl.closest('.cfi');
+          input.classList.toggle('confirmed-input', !!val);
+          input.style.borderColor = '';
+          if (el) {
+            el.classList.add('saved');
+            confirmSaved = { el: el, hasReal: !!val, timer: setTimeout(finalizeConfirmSaved_, 30000) };
+          }
+        })
         .withFailureHandler(function (err) {
           btnEl.disabled = false; btnEl.textContent = 'บันทึก';
           if (!handleAuthError(err)) alert('เกิดข้อผิดพลาด: ' + err.message);
@@ -2197,18 +2369,16 @@ if('serviceWorker' in navigator){
     function renderMoveResults(list) {
       moveResultsCache = list;
       const container = document.getElementById('moveResults');
-      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; return; }
-      let html = '<div class="table-scroll"><table><tr><th>รูป</th><th>รหัส / ชื่อ</th><th>ชั้น/ห้องปัจจุบัน</th><th></th></tr>';
-      list.forEach(function (s) {
-        html += '<tr>' +
-          '<td>' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
-          '<td style="font-size:12px;">' + codesAndNameRow(s) + '</td>' +
-          '<td>' + escapeHtml(s.grade + ' / ' + s.room) + '</td>' +
-          '<td><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\')">เลือกย้าย</button></td>' +
+      if (!list.length) { container.innerHTML = '<div class="empty">ไม่พบรายการ</div>'; fitBoxes_(); return; }
+      container.innerHTML = '<table class="lst">' + list.map(function (s) {
+        return '<tr>' +
+          '<td style="width:38px;">' + (s.photoUrl ? '<img class="thumb" src="' + s.photoUrl + '">' : '-') + '</td>' +
+          '<td><div class="one-line">' + codesCompact(s) + '</div>' +
+          '<div class="one-line" style="color:var(--muted);">' + escapeHtml(s.grade + '/' + s.room) + '</div></td>' +
+          '<td style="width:74px;text-align:right;"><button class="btn small" onclick="selectMoveStudent(\'' + escapeJs(s.id) + '\')">เลือกย้าย</button></td>' +
           '</tr>';
-      });
-      html += '</table></div>';
-      container.innerHTML = html;
+      }).join('') + '</table>';
+      fitBoxes_();
     }
 
     function selectMoveStudent(id) {
@@ -3270,6 +3440,28 @@ if('serviceWorker' in navigator){
     // ลงทะเบียนนักเรียน (สาธารณะ จากปุ่มหน้า login)
     // ===================================================================
     let pubRegFields = [];
+    let pubRegIdAsked = '', pubRegIdTimer = null;
+    function pubRegAskId() {
+      const inp = document.getElementById('pubRegRealId');
+      const v = inp.value.trim();
+      if (!v || v === pubRegIdAsked) return;
+      document.getElementById('pubRegIdAskVal').textContent = v;
+      document.getElementById('pubRegIdAsk').style.display = 'flex';
+    }
+    document.getElementById('pubRegRealId').addEventListener('input', function () {
+      clearTimeout(pubRegIdTimer);
+      pubRegIdTimer = setTimeout(pubRegAskId, 1500);
+    });
+    document.getElementById('pubRegRealId').addEventListener('change', function () { clearTimeout(pubRegIdTimer); pubRegAskId(); });
+    document.getElementById('pubRegPhone').addEventListener('focus', function () { clearTimeout(pubRegIdTimer); pubRegAskId(); });
+    document.getElementById('btnPubRegIdYes').addEventListener('click', function () {
+      pubRegIdAsked = document.getElementById('pubRegRealId').value.trim();
+      document.getElementById('pubRegIdAsk').style.display = 'none';
+    });
+    document.getElementById('btnPubRegIdNo').addEventListener('click', function () {
+      document.getElementById('pubRegRealId').value = ''; pubRegIdAsked = '';
+      document.getElementById('pubRegIdAsk').style.display = 'none';
+    });
 
     function isPubRegShowingSuccess() {
       return document.getElementById('pubRegSuccessView').style.display !== 'none';
@@ -3287,6 +3479,8 @@ if('serviceWorker' in navigator){
       document.getElementById('pubRegSearchResults').innerHTML = '';
       document.getElementById('pubRegSearchQuery').value = '';
       document.getElementById('pubRegPhone').value = '';
+      document.getElementById('pubRegRealId').value = '';
+      pubRegIdAsked = '';
       google.script.run
         .withSuccessHandler(function (fields) {
           pubRegFields = fields;
@@ -3339,6 +3533,7 @@ if('serviceWorker' in navigator){
       const phone = document.getElementById('pubRegPhone').value.trim();
       if (!grade || !room || !phone) { showMsg('pubRegMsg', 'กรุณากรอกระดับชั้น ห้อง และเบอร์โทร ให้ครบ', 'error'); return; }
       const customValues = collectCustomFieldValues('pubRegCustomFieldsWrap');
+      const claimedId = document.getElementById('pubRegRealId').value.trim();
       const btn = document.getElementById('btnSubmitPublicRegister');
       btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
       google.script.run
@@ -3356,7 +3551,7 @@ if('serviceWorker' in navigator){
           }
           showMsg('pubRegMsg', err.message, 'error');
         })
-        .publicRegisterStudent(grade, room, phone, customValues);
+        .publicRegisterStudent(grade, room, phone, customValues, claimedId);
     });
 
     // ===================================================================
