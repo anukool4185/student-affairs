@@ -178,7 +178,7 @@
       #mobileBottomNav { display: flex !important; }
 
       /* --- Header ลดขนาด --- */
-      header { padding: 10px 14px; gap: 6px; }
+      header { padding: 8px 10px; gap: 4px; }
       header .title h1 { font-size: 1.08em; }
       header .title p { font-size: 0.78em; }
       header .userbox { font-size: 0.82em; gap: 6px; }
@@ -197,19 +197,19 @@
       .subnav button { padding: 6px 10px; font-size: 0.82em; }
 
       /* เพิ่ม padding ด้านล่างกัน content ซ่อนหลัง bottom nav */
-      main { padding: 12px 10px 90px; }
+      main { padding: 10px 8px 72px; }
 
       /* --- Card ลด padding --- */
-      .card { padding: 14px 12px; margin-bottom: 14px; }
+      .card { padding: 10px 10px; margin-bottom: 10px; }
       .card h2 { font-size: 1.05em; margin-bottom: 10px; }
 
       /* --- Grid: 1 คอลัมน์เสมอบนมือถือ --- */
-      .grid { grid-template-columns: 1fr; gap: 8px; }
+      .grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
 
       /* --- Inline form: stack แนวตั้ง --- */
-      .inline-form { flex-direction: column; align-items: stretch; gap: 8px; }
-      .inline-form input { width: 100%; }
-      .inline-form button { width: 100%; }
+      .inline-form { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+      .inline-form input, .inline-form select { flex: 1 1 100px; min-width: 100px; width: auto; }
+      .inline-form button { width: auto; flex: 0 0 auto; }
       .inline-form label { width: auto; }
 
       /* --- ตาราง: scroll ซ้ายขวา ป้องกัน overflow --- */
@@ -219,8 +219,12 @@
       th { font-size: 0.78em; }
 
       /* --- ปุ่มบนมือถือใหญ่ขึ้น touch-friendly --- */
-      button.btn { min-height: 42px; font-size: 1em; }
-      button.btn.small { min-height: 34px; padding: 5px 10px; font-size: 0.82em; }
+      button.btn { min-height: 38px; font-size: 0.9em; padding: 7px 12px; width: auto; }
+      button.btn.full { width: 100%; }
+      button.btn.small { min-height: 30px; padding: 4px 9px; font-size: 0.8em; }
+      .photo-grid { grid-template-columns: repeat(2, 1fr); }
+      #photoLayout { flex-direction: column; gap: 10px; }
+      #photoStudentList { max-height: 38vh; overflow-y: auto; }
 
       /* --- Input / Select / Textarea ใช้ font 16px กัน iOS zoom --- */
       input, select, textarea { font-size: 16px; }
@@ -265,12 +269,40 @@
       main { padding: 10px 8px 80px; }
       button.btn { font-size: 13px; }
     }
+    @media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+
     @media print {
       body * { visibility: hidden; }
       .print-target, .print-target * { visibility: visible; }
       .print-target { position: absolute; top: 0; left: 0; width: 100%; }
     }
   </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e5eff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>
+if('serviceWorker' in navigator){
+  var hadCtrl=!!navigator.serviceWorker.controller, reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',function(){
+    if(!hadCtrl){hadCtrl=true;return;}
+    if(reloading)return; reloading=true;
+    var d=document.createElement('div');
+    d.textContent='🔄 มีการอัปเดตระบบ กำลังโหลดเวอร์ชันใหม่...';
+    d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1e5eff;color:#fff;text-align:center;padding:10px;font-size:14px;';
+    document.body.appendChild(d);
+    setTimeout(function(){location.reload();},1500);
+  });
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      function chk(){try{reg.update();}catch(e){}}
+      setInterval(chk,60000);
+      document.addEventListener('visibilitychange',function(){if(!document.hidden)chk();});
+    }).catch(function(){});
+  });
+}
+</script>
 </head>
 <body>
 
