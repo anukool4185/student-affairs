@@ -341,7 +341,7 @@
 <meta name="apple-mobile-web-app-title" content="DATA-STC.SCHOOL">
 <meta name="application-name" content="DATA-STC.SCHOOL">
 <script>
-var APP_VERSION='1.2.2', APP_VERSION_DATE='13/11/2569';
+var APP_VERSION='1.2.3', APP_VERSION_DATE='13/11/2569';
 document.addEventListener('DOMContentLoaded',function(){
   var t='เวอร์ชัน '+APP_VERSION+' ('+APP_VERSION_DATE+')';
   document.querySelectorAll('.app-version').forEach(function(e){e.textContent=t;});
@@ -1098,6 +1098,8 @@ if('serviceWorker' in navigator){
     let currentMoveStudent = null;
     let moveResultsCache = [];
     let sendHistoryCache = [];
+    let photoListCache = [];
+    let lastSearchResults = [];
     let currentEditId = null;
     let editingFieldId = null;
     let formFields = [];
@@ -1125,6 +1127,7 @@ if('serviceWorker' in navigator){
 
     function buildMobileNav(tabs) {
       const nav = document.getElementById('mobileBottomNav');
+      if (!nav) return;
       nav.innerHTML = tabs.map(function (tab) {
         return '<button class="mob-nav-item" data-tab="' + tab + '" onclick="switchTab(\'' + tab + '\')">' +
           '<span class="mob-icon">' + (TAB_ICONS[tab] || '•') + '</span>' +
@@ -1172,7 +1175,13 @@ if('serviceWorker' in navigator){
         .previewTempId(TOKEN, grade, room);
     }
 
-    if (TOKEN && ROLE) showApp();
+    // กู้ session ที่ล็อกอินค้างไว้ (เช่น รีโหลดหน้า / แอปอัปเดตแล้วรีโหลดเอง)
+    // ต้องรอให้สคริปต์ทั้งไฟล์ประกาศตัวแปรครบก่อน ไม่งั้นเจอ "Cannot access ... before initialization"
+    // รอให้หน้าเว็บสร้างครบทุกส่วนก่อน (รวมเมนูล่างที่อยู่ท้ายไฟล์) — กันพังตอนรีเฟรชบนเครื่องช้า/มือถือ
+    if (TOKEN && ROLE) {
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { showApp(); });
+      else setTimeout(showApp, 0);
+    }
     loadPublicAnnouncements();
 
     function loadPublicAnnouncements() {
@@ -2050,7 +2059,6 @@ if('serviceWorker' in navigator){
     // ===================================================================
     // TAB: จัดการรูปภาพ (admin: กรองได้ทุกชั้น/ห้อง / teacher: เห็นแค่ห้องตัวเอง)
     // ===================================================================
-    let photoListCache = [];
 
     function initPhotoFilters() {
       fillSelect(document.getElementById('photoFilterGrade'), gradeOptions, 'ทั้งหมด');
@@ -2194,7 +2202,6 @@ if('serviceWorker' in navigator){
         .listStudents(TOKEN, filter);
     });
 
-    let lastSearchResults = [];
     function searchRowHtml(s) {
       const delLabel = (ROLE === 'admin') ? 'ลบ' : 'แจ้งลบ';
       const hash = [s.photoUrl, s.photoStatus, s.realId, s.tempId, s.grade, s.room, fullNameOf_(s.customFields)].join('|');
