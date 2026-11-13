@@ -327,7 +327,7 @@
 <meta name="apple-mobile-web-app-title" content="DATA-STC.SCHOOL">
 <meta name="application-name" content="DATA-STC.SCHOOL">
 <script>
-var APP_VERSION='1.1.0', APP_VERSION_DATE='13/11/2569';
+var APP_VERSION='1.1.1', APP_VERSION_DATE='13/11/2569';
 document.addEventListener('DOMContentLoaded',function(){
   var t='เวอร์ชัน '+APP_VERSION+' ('+APP_VERSION_DATE+')';
   document.querySelectorAll('.app-version').forEach(function(e){e.textContent=t;});
@@ -1267,6 +1267,32 @@ if('serviceWorker' in navigator){
       if (e.target.closest && e.target.closest('nav, .subnav, #mobileBottomNav, .filter-row, #photoShowAll, #confirmShowAll')) setTimeout(fitBoxes_, 120);
     });
     window.addEventListener('scroll', function () { clearTimeout(window._fitT); window._fitT = setTimeout(function () { fitBoxes_(true); }, 150); }, { passive: true });
+
+    // ปัดซ้าย/ขวาที่แถบหัวเรื่อง (บนมือถือ) เพื่อสลับแท็บ — ไม่ชนกับการเลื่อนตารางด้านล่าง
+    (function () {
+      var sx = 0, sy = 0, tracking = false;
+      var hd = document.querySelector('#appScreen header');
+      if (!hd) return;
+      hd.addEventListener('touchstart', function (e) {
+        if (window.innerWidth >= 768 || e.touches.length !== 1) return;
+        tracking = true; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      }, { passive: true });
+      hd.addEventListener('touchend', function (e) {
+        if (!tracking) return; tracking = false;
+        var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        var tabs = ROLE_TABS[ROLE] || [];
+        var cur = document.querySelector('#mobileBottomNav .mob-nav-item.active');
+        var i = tabs.indexOf(cur ? cur.dataset.tab : '');
+        if (i < 0) return;
+        var n = i + (dx < 0 ? 1 : -1);
+        if (n >= 0 && n < tabs.length) {
+          switchTab(tabs[n]);
+          var el = document.querySelector('#mobileBottomNav .mob-nav-item.active');
+          if (el && el.scrollIntoView) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+        }
+      }, { passive: true });
+    })();
 
     function fillSelect(select, options, placeholder) {
       select.innerHTML = '';
